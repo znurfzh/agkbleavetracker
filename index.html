@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AGKB Leave Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --blue:      #0e17c2;
+      --blue-dk:   #0b129e;
+      --blue-lt:   #eef0fd;
+      --blue-mid:  #c7d2fe;
+      --green:     #27ae60;
+      --green-lt:  #eafaf1;
+      --amber:     #e67e22;
+      --amber-lt:  #fef3e8;
+      --red:       #e74c3c;
+      --red-lt:    #fef0ef;
+      --dark:      #1a2332;
+      --mid:       #4a5568;
+      --muted:     #8a96a3;
+      --border:    #e2e8f0;
+      --surface:   #f0f4f8;
+      --card:      #ffffff;
+      --r-sm:      8px;
+      --r-md:      12px;
+      --r-lg:      18px;
+      --shadow:    0 2px 12px rgba(26,35,50,0.07);
+      --shadow-md: 0 6px 24px rgba(26,35,50,0.10);
+      --sans:      'Hanken Grotesk', system-ui, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--sans);
+      background: var(--surface);
+      color: var(--dark);
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #loader {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.92); backdrop-filter: blur(6px);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999; gap: 14px;
+    }
+    #loader.show { display: flex; }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loader-text { font-size: 13px; color: var(--muted); font-weight: 500; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(26,35,50,0.45);
+      display: none; align-items: center; justify-content: center;
+      z-index: 8000; padding: 20px;
+    }
+    .modal-backdrop.show { display: flex; }
+
+    .alert-box {
+      background: var(--card); border-radius: var(--r-lg);
+      padding: 2rem; max-width: 320px; width: 100%;
+      text-align: center; box-shadow: var(--shadow-md);
+    }
+    .alert-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .alert-msg  { font-size: 0.88rem; color: var(--mid); margin-bottom: 1.2rem; line-height: 1.6; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 11px 20px; border: none; border-radius: var(--r-sm);
+      font-family: var(--sans); font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; transition: all 0.18s; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-full  { width: 100%; }
+    .btn-blue  { background: var(--blue);  color: #fff; }
+    .btn-blue:hover:not(:disabled)  { background: var(--blue-dk); }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-green:hover:not(:disabled) { filter: brightness(0.92); }
+    .btn-red   { background: var(--red);   color: #fff; }
+    .btn-red:hover:not(:disabled)   { filter: brightness(0.92); }
+    .btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--mid); }
+    .btn-ghost:hover { background: var(--surface); }
+    .btn-sm    { padding: 8px 14px; font-size: 0.8rem; }
+
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block; font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      color: var(--mid); margin-bottom: 5px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      font-family: var(--sans); font-size: 0.9rem; color: var(--dark);
+      background: var(--card); transition: border-color 0.18s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none; border-color: var(--blue);
+    }
+    .field textarea { resize: vertical; min-height: 70px; }
+    .field-desc {
+      font-size: 0.74rem; color: var(--muted); margin: -2px 0 8px;
+      line-height: 1.5;
+    }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a96a3' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+
+    #loginScreen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+      background: var(--surface); position: relative; overflow: hidden;
+    }
+    #loginScreen::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 15% 35%, rgba(14,23,194,0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 50% 40% at 85% 70%, rgba(39,174,96,0.08) 0%, transparent 55%);
+      pointer-events: none;
+    }
+    .login-card {
+      background: var(--card); border-radius: var(--r-lg);
+      padding: clamp(1.5rem, 5vw, 2.25rem);
+      width: 100%; max-width: 380px;
+      box-shadow: var(--shadow-md); position: relative; z-index: 1;
+    }
+    .login-brand {
+      font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px;
+      color: var(--dark); margin-bottom: 3px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .login-brand-dot { color: var(--blue); }
+    .login-sub { font-size: 0.78rem; color: var(--muted); margin-bottom: 1.75rem; }
+
+    .autofill-badge {
+      font-size: 0.7rem; color: var(--green); font-weight: 600;
+      margin-top: 5px; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .autofill-edit {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.7rem; color: var(--blue); font-weight: 600;
+      font-family: var(--sans); padding: 0; margin-left: 6px;
+      text-decoration: underline;
+    }
+
+    .how-to-toggle {
+      background: none; border: none; cursor: pointer;
+      font-size: 0.7rem; color: var(--blue); font-weight: 600;
+      font-family: var(--sans); padding: 2px 0; margin-top: 3px;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .how-to-box {
+      display: none; margin-top: 8px;
+      background: var(--blue-lt); border: 1px solid var(--blue-mid);
+      border-radius: var(--r-sm); padding: 10px 12px;
+      font-size: 0.74rem; color: var(--mid); line-height: 1.6;
+    }
+    .how-to-box.open { display: block; }
+    .how-to-box ol { padding-left: 1.1rem; margin-bottom: 4px; }
+    .url-ex {
+      background: rgba(0,0,0,0.05); border-radius: 4px;
+      padding: 4px 8px; font-family: monospace; font-size: 0.7rem;
+      margin-top: 5px; word-break: break-all;
+    }
+    .url-ex strong { color: var(--blue); }
+
+    .inline-pin-wrap {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height 0.3s ease, opacity 0.25s, margin-top 0.25s;
+      margin-top: 0;
+    }
+    .inline-pin-wrap.show { max-height: 90px; opacity: 1; margin-top: 0; }
+
+    .chief-toggle-row { text-align: center; margin-top: 1rem; }
+    .chief-toggle-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--sans); font-size: 0.73rem; color: var(--muted);
+      display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px;
+      transition: color 0.18s;
+    }
+    .chief-toggle-btn:hover { color: var(--mid); }
+    .chief-panel {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height 0.4s ease, opacity 0.3s, margin-top 0.3s;
+      margin-top: 0;
+    }
+    .chief-panel.open { max-height: 280px; opacity: 1; margin-top: 12px; }
+    .chief-inner {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--r-md); padding: 14px;
+    }
+    .chief-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+    .link-box {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--r-sm); padding: 8px 10px;
+      font-size: 0.71rem; color: var(--blue); font-family: monospace;
+      word-break: break-all; margin: 8px 0; display: none;
+    }
+
+    #mainApp { display: none; }
+
+    #appHeader {
+      background: var(--dark); padding: 0 16px;
+      height: 52px; display: flex; align-items: center;
+      justify-content: space-between; position: sticky; top: 0; z-index: 200;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .header-brand { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.3px; color: #fff; }
+    .header-brand span { color: #93c5fd; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .header-name  { font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.6); }
+    .btn-logout {
+      background: none; border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.5); padding: 5px 11px;
+      border-radius: var(--r-sm); font-family: var(--sans);
+      font-size: 0.72rem; cursor: pointer; transition: all 0.18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-logout:hover { border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.85); }
+
+    #tabBar {
+      background: var(--card); border-bottom: 1.5px solid var(--border);
+      display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #tabBar::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--sans); font-size: 0.82rem; font-weight: 600;
+      color: var(--muted); padding: 13px 16px; flex-shrink: 0;
+      border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
+      transition: color 0.18s, border-color 0.18s;
+      display: flex; align-items: center; gap: 5px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-btn:hover  { color: var(--dark); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .tab-badge {
+      background: var(--red); color: #fff;
+      font-size: 10px; font-weight: 700; min-width: 17px; height: 17px;
+      border-radius: 9px; display: inline-flex; align-items: center;
+      justify-content: center; padding: 0 4px;
+    }
+
+    .tab-panel { display: none; padding: 16px; max-width: 680px; margin: 0 auto; }
+    .tab-panel.active { display: block; }
+
+    .balance-bar {
+      background: var(--dark);
+      border-radius: var(--r-lg); padding: 16px 18px;
+      margin-bottom: 16px; display: flex;
+      align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .bb-left .bb-label { font-size: 0.68rem; color: rgba(255,255,255,0.45); margin-bottom: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .bb-left .bb-val   { font-size: 1.5rem; font-weight: 800; color: #fff; line-height: 1; }
+    .bb-left .bb-val.warn   { color: #fbbf24; }
+    .bb-left .bb-val.danger { color: #f87171; }
+    .bb-left .bb-sub   { font-size: 0.7rem; color: rgba(255,255,255,0.35); margin-top: 3px; }
+    .bb-pills { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+    .bb-pill  {
+      font-size: 10px; font-weight: 700; padding: 3px 8px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .bb-pill-g { background: rgba(39,174,96,0.22);  color: #86efac; }
+    .bb-pill-b { background: rgba(14,23,194,0.35);  color: #93c5fd; }
+    .bb-pill-a { background: rgba(230,126,34,0.22); color: #fcd34d; }
+
+    .card {
+      background: var(--card); border-radius: var(--r-lg);
+      padding: 18px; box-shadow: var(--shadow); margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 0.9rem; font-weight: 700; color: var(--dark);
+      margin-bottom: 14px;
+    }
+
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .type-card {
+      border: 2px solid var(--border); border-radius: var(--r-md);
+      background: var(--card); padding: 14px 10px;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.18s, background 0.18s;
+      font-family: var(--sans);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .type-card:hover     { border-color: var(--blue); background: var(--blue-lt); }
+    .type-card.selected  { border-color: var(--blue); background: var(--blue-lt); }
+    .type-card .tc-icon  { font-size: 1.5rem; display: block; margin-bottom: 6px; }
+    .type-card .tc-name  { font-size: 0.82rem; font-weight: 700; color: var(--dark); }
+    .type-card .tc-desc  { font-size: 0.68rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+    #dateSection { margin-top: 2px; }
+
+    .chip-area {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 10px; background: var(--surface);
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      min-height: 46px; cursor: default;
+    }
+    .chip-area:focus-within { border-color: var(--blue); }
+    .date-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: var(--blue-lt); border: 1px solid var(--blue-mid);
+      color: var(--blue); border-radius: 20px;
+      padding: 3px 10px; font-size: 0.73rem; font-weight: 700;
+    }
+    .date-chip button {
+      background: none; border: none; cursor: pointer;
+      color: var(--blue); font-size: 0.85rem; padding: 0; line-height: 1;
+    }
+    .date-chip button:hover { color: var(--red); }
+    .chip-empty { font-size: 0.76rem; color: var(--muted); align-self: center; }
+    .add-date-row { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+    .add-date-row input { flex: 1; }
+    .btn-add-date {
+      background: var(--blue); color: white; border: none; cursor: pointer;
+      border-radius: var(--r-sm); padding: 11px 14px;
+      font-family: var(--sans); font-size: 0.8rem; font-weight: 700;
+      white-space: nowrap; transition: background 0.18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-add-date:hover { background: var(--blue-dk); }
+
+    .date-summary {
+      font-size: 0.73rem; color: var(--muted); margin-top: 6px; font-style: italic;
+    }
+
+    .half-day-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--surface);
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      margin-top: 10px; margin-bottom: 12px; cursor: pointer; transition: border-color 0.18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .half-day-row.on { border-color: var(--blue); background: var(--blue-lt); }
+    .half-day-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue); flex-shrink: 0; }
+    .hd-label { font-size: 0.82rem; font-weight: 700; color: var(--dark); }
+    .hd-desc  { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+
+    .log-item {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--r-md); padding: 13px 15px;
+      margin-bottom: 9px; display: flex;
+      align-items: flex-start; gap: 11px; box-shadow: var(--shadow);
+    }
+    .log-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+    .log-body { flex: 1; min-width: 0; }
+    .log-type { font-size: 0.85rem; font-weight: 700; color: var(--dark); }
+    .log-meta { font-size: 0.73rem; color: var(--muted); margin-top: 2px; }
+    .log-notes {
+      font-size: 0.76rem; color: var(--mid); margin-top: 5px;
+      line-height: 1.5; font-style: italic;
+      white-space: pre-line;
+    }
+    .log-reviewer { font-size: 0.71rem; color: var(--muted); margin-top: 3px; }
+
+    .status-pill {
+      font-size: 10px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; text-transform: uppercase; letter-spacing: 0.3px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .pill-approved { background: var(--green-lt); color: #155724; }
+    .pill-pending  { background: var(--amber-lt);  color: #7d3c00; }
+    .pill-rejected { background: var(--red-lt);    color: #7b1d1d; }
+
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+    .empty-icon  { font-size: 2rem; margin-bottom: 0.6rem; }
+    .empty-msg   { font-size: 0.85rem; }
+
+    .section-label {
+      font-size: 0.67rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* Balance Panels */
+    .bal-panels { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 16px; }
+    .bal-panel {
+      background: var(--blue); border-radius: var(--r-lg);
+      padding: 14px 16px; position: relative;
+    }
+    .bal-panel-label {
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: rgba(255,255,255,0.7); margin-bottom: 6px;
+    }
+    .bal-panel-val {
+      font-size: 1.6rem; font-weight: 800; color: #fff; line-height: 1;
+    }
+    .bal-panel-val.warn   { color: #fff3b0; }
+    .bal-panel-val.danger { color: #ffd4d0; }
+    .bal-panel-sub {
+      font-size: 0.68rem; color: rgba(255,255,255,0.65);
+      margin-top: 5px; line-height: 1.4;
+    }
+    .bal-panel-breakdown {
+      display: flex; gap: 10px; margin-top: 8px;
+      padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.18);
+    }
+    .bal-panel-breakdown-item {
+      flex: 1; font-size: 0.66rem; color: rgba(255,255,255,0.75);
+    }
+    .bal-panel-breakdown-item b {
+      color: #fff; font-size: 0.78rem; font-weight: 800; display: block;
+    }
+    .bal-panel-icon {
+      position: absolute; right: 14px; top: 12px;
+      font-size: 1.3rem; opacity: 0.55;
+    }
+    .bal-panel.bal-panel-total {
+      background: var(--dark);
+    }
+    @media (min-width: 480px) {
+      .bal-panels { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    /* Staff History */
+    .hist-filter-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .hist-filter-btn {
+      padding: 7px 14px; border: 1.5px solid var(--border);
+      border-radius: 20px; background: var(--card);
+      font-family: var(--sans); font-size: 0.78rem; font-weight: 600;
+      color: var(--mid); cursor: pointer; transition: all 0.18s;
+    }
+    .hist-filter-btn.active {
+      border-color: var(--blue); background: var(--blue-lt); color: var(--blue);
+    }
+    .hist-member-filter {
+      flex: 1; min-width: 120px;
+      padding: 7px 12px; border: 1.5px solid var(--border);
+      border-radius: var(--r-sm); font-family: var(--sans);
+      font-size: 0.78rem; color: var(--dark); background: var(--card);
+      appearance: none; -webkit-appearance: none;
+    }
+    .hist-member-filter:focus { outline: none; border-color: var(--blue); }
+
+.bal-table { background: var(--card); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 20px; }
+    .bt-row {
+      display: grid;
+      grid-template-columns: 22px 1fr 58px 58px 58px 70px;
+      padding: 11px 14px; border-bottom: 1px solid var(--border);
+      align-items: center; gap: 6px;
+    }
+    .bt-row:last-child { border-bottom: none; }
+    .bt-head { background: var(--dark); }
+    .bt-head .bt-cell {
+      font-size: 0.64rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.4px;
+      color: rgba(255,255,255,0.45);
+    }
+    .bt-cell { font-size: 0.8rem; color: var(--mid); text-align: center; }
+    .bt-cell.bt-name { text-align: left; font-weight: 600; color: var(--dark); font-size: 0.84rem; }
+    .bt-cell.bt-name .role-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px;
+      background: var(--blue-lt); color: var(--blue); margin-left: 4px;
+    }
+    .bt-cell.bt-name .me-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px;
+      background: var(--green-lt); color: var(--green); margin-left: 4px;
+    }
+    .bt-cell.bt-bal { font-weight: 800; font-size: 0.9rem; }
+    .c-good   { color: var(--green); }
+    .c-warn   { color: var(--amber); }
+    .c-danger { color: var(--red);   }
+
+    .bt-chevron {
+      width: 16px; height: 16px; flex-shrink: 0;
+      color: var(--muted); transition: transform 0.2s ease;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .bt-row.bt-open .bt-chevron { transform: rotate(90deg); color: var(--blue); }
+
+    .bt-detail {
+      display: none; grid-template-columns: 1fr 1fr;
+      gap: 12px; padding: 12px 12px 12px 42px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .bt-detail.open { display: grid; }
+    .bt-detail-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--r-md); padding: 14px 16px;
+    }
+    .bt-detail-card.bt-detail-leave { border-left: 3px solid var(--blue); }
+    .bt-detail-card.bt-detail-comp  { border-left: 3px solid var(--amber); }
+    .bt-detail-card-title {
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .bt-detail-item {
+      font-size: 0.76rem; color: var(--mid);
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding: 5px 0; border-bottom: 1px solid var(--border);
+    }
+    .bt-detail-item:last-child { border-bottom: none; padding-top: 8px; margin-top: 2px; border-top: 1.5px solid var(--border); }
+    .bt-detail-item:last-child span { font-weight: 700; color: var(--dark); }
+    .bt-detail-item b { font-size: 0.92rem; color: var(--dark); font-weight: 800; }
+    .bt-detail-item:last-child b { font-size: 1rem; }
+    @media (max-width: 480px) {
+      .bt-detail { grid-template-columns: 1fr; padding-left: 16px; }
+    }
+
+    .pending-card {
+      background: var(--card); border: 1.5px solid var(--amber-lt);
+      border-left: 4px solid var(--amber);
+      border-radius: var(--r-md); padding: 15px;
+      margin-bottom: 12px; box-shadow: var(--shadow);
+    }
+    .pc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .pc-name { font-size: 0.9rem; font-weight: 700; color: var(--dark); }
+    .pc-date { font-size: 0.76rem; color: var(--mid); margin-top: 2px; }
+    .pc-notes { font-size: 0.76rem; color: var(--mid); font-style: italic; margin-bottom: 10px; line-height: 1.5; }
+
+    .bal-breakdown {
+      background: var(--surface); border-radius: var(--r-sm);
+      padding: 10px 12px; margin-bottom: 12px; font-size: 0.77rem;
+    }
+    .bal-breakdown-title {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--muted); margin-bottom: 7px;
+    }
+    .bal-row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--mid); }
+    .bal-row.total { border-top: 1.5px solid var(--border); margin-top: 3px; padding-top: 6px; font-weight: 700; color: var(--dark); }
+    .bal-row.after { border-top: 1.5px dashed var(--border); margin-top: 2px; padding-top: 6px; font-weight: 800; }
+
+    .pc-actions { display: flex; gap: 8px; }
+    .pc-actions .btn { flex: 1; }
+    .no-action-note { font-size: 0.73rem; color: var(--muted); padding-top: 4px; }
+
+    .cal-note {
+      background: var(--blue-lt); border: 1px solid var(--blue-mid);
+      border-radius: var(--r-sm); padding: 10px 12px;
+      font-size: 0.75rem; color: var(--mid); line-height: 1.5;
+      display: flex; align-items: flex-start; gap: 8px; margin-top: 6px;
+    }
+    .cal-note-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+    .handover-banner {
+      background: var(--amber-lt); border: 1.5px solid var(--amber);
+      border-radius: var(--r-md); padding: 14px 16px;
+      margin-bottom: 14px; display: flex; gap: 12px; align-items: flex-start;
+    }
+    .handover-banner-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+    .handover-banner-body { flex: 1; min-width: 0; }
+    .handover-banner-title { font-size: 0.85rem; font-weight: 700; color: #92400e; margin-bottom: 3px; }
+    .handover-banner-desc  { font-size: 0.76rem; color: #78350f; line-height: 1.5; margin-bottom: 10px; }
+
+    .handover-modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(26,35,50,0.5);
+      display: none; align-items: center; justify-content: center;
+      z-index: 8500; padding: 20px;
+    }
+    .handover-modal-backdrop.show { display: flex; }
+    .handover-modal {
+      background: var(--card); border-radius: var(--r-lg);
+      padding: 24px 20px; width: 100%; max-width: 600px;
+      max-height: min(85vh, 720px); overflow-y: auto;
+      box-shadow: var(--shadow-md);
+      animation: popIn 0.22s ease;
+    }
+    @keyframes popIn { from { transform: scale(0.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .handover-modal-title { font-size: 1rem; font-weight: 800; color: var(--dark); margin-bottom: 4px; }
+    .handover-modal-sub   { font-size: 0.76rem; color: var(--muted); margin-bottom: 18px; line-height: 1.5; }
+    .handover-field-label {
+      display: block; font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.6px; color: var(--mid); margin-bottom: 5px;
+    }
+    .handover-field-hint  { font-size: 0.68rem; color: var(--muted); margin-bottom: 5px; font-style: italic; }
+    .handover-field-wrap  { margin-bottom: 14px; }
+    .handover-field-wrap textarea {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      font-family: var(--sans); font-size: 0.88rem; color: var(--dark);
+      background: var(--card); resize: vertical; min-height: 72px;
+      transition: border-color 0.18s;
+    }
+    .handover-field-wrap textarea:focus { outline: none; border-color: var(--amber); }
+    .handover-field-wrap input {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      font-family: var(--sans); font-size: 0.88rem; color: var(--dark);
+      background: var(--card); transition: border-color 0.18s;
+    }
+    .handover-field-wrap input:focus { outline: none; border-color: var(--amber); }
+    .handover-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .handover-actions .btn { flex: 1; }
+    .btn-amber { background: var(--amber); color: #fff; }
+    .btn-amber:hover:not(:disabled) { filter: brightness(0.92); }
+
+    .handover-submitted {
+      margin-top: 10px; background: var(--green-lt);
+      border: 1px solid #86efac; border-radius: var(--r-sm);
+      padding: 8px 12px; font-size: 0.74rem; color: #155724;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .pill-handover { background: #fef3e8; color: #92400e; }
+    .pill-halfday  { background: var(--blue-lt); color: var(--blue); }
+    .pill-rollover {
+      font-size: 10px; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; background: rgba(255,255,255,0.22); color: #fff;
+      white-space: nowrap;
+    }
+
+    #submitMsg {
+      font-size: 0.77rem; margin-top: 6px; min-height: 1.1rem;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 460px) {
+      .bt-row   { grid-template-columns: 18px 1fr 52px 52px 62px; }
+      .bt-row .bt-cell:nth-child(4) { display: none; }
+      .tab-btn  { padding: 12px 13px; font-size: 0.78rem; }
+      .type-card .tc-desc { display: none; }
+    }
+    @media (max-width: 360px) {
+      .bal-table .bt-row { grid-template-columns: 16px 1fr 48px 58px; }
+      .bt-row .bt-cell:nth-child(3),
+      .bt-row .bt-cell:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <p class="loader-text" id="loaderText">🔃 Loading…</p>
+</div>
+
+<div id="alertModal" class="modal-backdrop">
+  <div class="alert-box">
+    <div class="alert-icon" id="alertIcon">ℹ️</div>
+    <div class="alert-msg"  id="alertMsg"></div>
+    <button class="btn btn-blue btn-full" onclick="closeAlert()">OK</button>
+  </div>
+</div>
+
+<div id="handoverModal" class="handover-modal-backdrop">
+  <div class="handover-modal">
+    <div class="handover-modal-title">🗂️ Handover Notice</div>
+    <div class="handover-modal-sub" id="handoverModalSub">
+      Your leave has been approved. Please fill in this handover so your team knows what's in progress while you're out. This is required before your leave begins.
+    </div>
+
+    <div class="handover-field-wrap">
+      <label class="handover-field-label">Tasks in Progress <span style="color:var(--red);">*</span></label>
+      <div class="handover-field-hint">What ongoing work should the team be aware of?</div>
+      <textarea id="ho-tasks" placeholder="e.g. slide deck draft, report, data analytics..." rows="3"></textarea>
+    </div>
+
+    <div class="handover-field-wrap">
+      <label class="handover-field-label">Point of Contact <span style="color:var(--red);">*</span></label>
+      <div class="handover-field-hint">Who should the team reach for urgent matters?</div>
+      <input type="text" id="ho-contact" placeholder="e.g. Bu Dewi for curriculum items, Elyska for student data">
+    </div>
+
+    <div class="handover-field-wrap">
+      <label class="handover-field-label">Urgent Items / Deadlines</label>
+      <div class="handover-field-hint">Anything time-sensitive during your leave period?</div>
+      <textarea id="ho-urgent" placeholder="e.g. Submit NST report by 20 June — Wulan has the draft" rows="2"></textarea>
+    </div>
+
+    <div class="handover-field-wrap">
+      <label class="handover-field-label">Drive Link <span style="color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <div class="handover-field-hint">Paste a Google Drive file or folder link if relevant</div>
+      <input type="url" id="ho-drive" placeholder="https://drive.google.com/…">
+    </div>
+
+    <div class="handover-field-wrap">
+      <label class="handover-field-label">Additional Notes</label>
+      <div class="handover-field-hint">Anything else the team should know?</div>
+      <textarea id="ho-notes" placeholder="Optional — passwords, access, context…" rows="2"></textarea>
+    </div>
+
+    <div id="handoverFormError" style="font-size:0.76rem; color:var(--red); margin-bottom:10px; min-height:1rem;"></div>
+
+    <div class="handover-actions">
+      <button class="btn btn-ghost" onclick="closeHandoverModal()">Cancel</button>
+      <button class="btn btn-amber" id="handoverSubmitBtn" onclick="submitHandover()">✅ Submit Handover</button>
+    </div>
+  </div>
+</div>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">Leave<span class="login-brand-dot">Tracker</span></div>
+    <p class="login-sub">Teacher leave management for AGKB.</p>
+
+    <div class="field">
+      <label for="loginSheetId">Google Spreadsheet ID</label>
+      <input type="text" id="loginSheetId" placeholder="e.g. 1VUQuaZerm…"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter') doLogin()"
+        oninput="onSheetIdInput(this.value)">
+      <div id="sheetIdStatus"></div>
+      <button class="how-to-toggle" onclick="toggleHowTo('howto-sheet')">❓ Where do I find this?</button>
+      <div class="how-to-box" id="howto-sheet">
+        <ol>
+          <li>Open your Leave Tracker Google Spreadsheet</li>
+          <li>Copy the string between <code>/d/</code> and <code>/edit</code> in the URL</li>
+        </ol>
+        <div class="url-ex">docs.google.com/spreadsheets/d/<strong>1VUQuaZerm…</strong>/edit</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="loginName">Your Name</label>
+      <select id="loginName" onchange="onNameSelect(this.value)">
+        <option value="">— Select your name —</option>
+      </select>
+    </div>
+
+    <div class="inline-pin-wrap" id="inlinePinWrap">
+      <div class="field" style="margin-bottom: 1rem;">
+        <label for="inlinePin">Head of School PIN</label>
+        <input type="password" id="inlinePin" inputmode="numeric"
+          placeholder="Enter PIN" autocomplete="off"
+          onkeydown="if(event.key==='Enter') doLogin()"
+          oninput="onNameSelect($('loginName').value)">
+      </div>
+    </div>
+
+    <button class="btn btn-blue btn-full" onclick="doLogin()" id="loginBtn" disabled>
+      → Open Dashboard
+    </button>
+
+    <div class="chief-toggle-row">
+      <button class="chief-toggle-btn" onclick="toggleChief()">Head of School Tools</button>
+    </div>
+    <div class="chief-panel" id="chiefPanel">
+      <div class="chief-inner">
+        <p class="chief-desc">Generate a shareable link with your Sheet ID pre-filled — team members just select their name.</p>
+        <div class="field" style="margin-bottom:8px;">
+          <label>Spreadsheet ID</label>
+          <input type="text" id="genSheetId" placeholder="Sheet ID" autocomplete="off">
+        </div>
+        <button class="btn btn-blue btn-sm btn-full" onclick="generateLink()">🔗 Generate Link</button>
+        <div class="link-box" id="generatedLink"></div>
+        <button class="btn btn-ghost btn-sm btn-full" id="copyLinkBtn"
+          style="display:none; margin-top:6px;" onclick="copyLink()">🔗 Copy Link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="mainApp">
+
+  <header id="appHeader">
+    <div class="header-brand">Leave<span>Tracker</span></div>
+    <div class="header-right">
+      <span class="header-name" id="headerName"></span>
+      <button class="btn-logout" onclick="doLogout()">← Logout</button>
+    </div>
+  </header>
+
+  <nav id="tabBar">
+    <button class="tab-btn active" id="tab-submit" onclick="switchTab('submit')">✏️ Submit</button>
+    <button class="tab-btn" id="tab-history" onclick="switchTab('history')">📋 My History</button>
+    <button class="tab-btn" id="tab-dashboard" onclick="switchTab('dashboard')">
+      🤝 Team
+      <span class="tab-badge" id="pendingBadge" style="display:none;">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('teamhistory')" id="tab-teamhistory" style="display:none;">📚 Staff History</button>
+    <button class="tab-btn" id="tab-import" onclick="switchTab('import')" style="display:none;">
+     ✍️ Import
+    </button>
+  </nav>
+
+  <div class="tab-panel active" id="panel-submit">
+
+    <div id="handoverBanner" class="handover-banner" style="display:none;"></div>
+
+    <div class="bal-panels" id="balancePanels">
+      <div class="bal-panel bal-panel-total" id="panelTotal">
+        <div class="bal-panel-icon">📊</div>
+        <div class="bal-panel-label">Total Balance</div>
+        <div class="bal-panel-val" id="panelTotalVal">—</div>
+        <div class="bal-panel-sub" id="panelTotalSub">days remaining</div>
+        <div id="panelRolloverPills" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;"></div>
+        <div class="bal-panel-breakdown">
+          <div class="bal-panel-breakdown-item">Gained<b id="panelTotalGained">—</b></div>
+          <div class="bal-panel-breakdown-item">Used<b id="panelTotalUsedB">—</b></div>
+        </div>
+      </div>
+      <div class="bal-panel" id="panelMonthly">
+        <div class="bal-panel-icon">🌴</div>
+        <div class="bal-panel-label">Leave Balance</div>
+        <div class="bal-panel-val" id="panelMonthlyVal">—</div>
+        <div class="bal-panel-sub" id="panelMonthlySub">days remaining</div>
+        <div class="bal-panel-breakdown">
+          <div class="bal-panel-breakdown-item">Gained<b id="panelMonthlyGained">—</b></div>
+          <div class="bal-panel-breakdown-item">Used<b id="panelMonthlyUsedB">—</b></div>
+        </div>
+      </div>
+      <div class="bal-panel" id="panelOT">
+        <div class="bal-panel-icon">🗓️</div>
+        <div class="bal-panel-label">Overtime Comp</div>
+        <div class="bal-panel-val" id="panelOTVal">—</div>
+        <div class="bal-panel-sub" id="panelOTSub">days earned</div>
+        <div class="bal-panel-breakdown">
+          <div class="bal-panel-breakdown-item">Gained<b id="panelOTGained">—</b></div>
+          <div class="bal-panel-breakdown-item">Used<b id="panelOTUsedB">—</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">New Entry</div>
+
+            <div class="type-grid" style="grid-template-columns:1fr;">
+        <button class="type-card selected" id="type-leave" onclick="selectType('Leave Request')">
+          <span class="tc-icon">🌴</span>
+          <div class="tc-name">Leave Request</div>
+          <div class="tc-desc">Annual Leave or Sick Day</div>
+        </button>
+      </div>
+
+      <div class="field" id="leaveSubtypeField" style="margin-bottom:14px; margin-top:12px;">
+        <label for="leaveSubtype">Leave Type</label>
+        <select id="leaveSubtype" onchange="onLeaveSubtypeChange()">
+          <option value="Annual Leave">Annual Leave (12 days/year — Batch 1)</option>
+          <option value="Sick Day">Sick Day (doctor letter required for 2+ consecutive days)</option>
+        </select>
+      </div>
+
+      <div id="dateSection" style="display:none;">
+        <div class="field">
+          <label>Selected Dates</label>
+          <div class="chip-area" id="dateChips">
+            <span class="chip-empty">No dates selected yet</span>
+          </div>
+          <div class="add-date-row">
+            <input type="date" id="datePickerInput" class="field" style="margin-bottom:0;">
+            <button class="btn-add-date" onclick="addDate()">+ Add</button>
+          </div>
+        </div>
+        <label class="half-day-row" id="halfDayRow" onclick="toggleHalfDay()">
+          <input type="checkbox" id="halfDayCheck" onclick="event.stopPropagation(); toggleHalfDay()">
+          <div>
+            <div class="hd-label">Half-day</div>
+            <div class="hd-desc">Counts as 0.5 days</div>
+          </div>
+        </label>
+      </div>
+
+            <div class="field" id="driveLinkField" style="display:none; margin-top:12px;">
+        <label for="driveLinkInput">Doctor Letter / MCU Report <span style="color:var(--red);">*</span></label>
+        <div class="field-desc">Required for sick leave of 2 or more consecutive days. Paste your Google Drive link.</div>
+        <input type="url" id="driveLinkInput" placeholder="https://drive.google.com/…" autocomplete="off" oninput="updateSubmitButton()">
+      </div>
+      <div class="field" id="notesField" style="display:none; margin-top:8px;">
+        <label for="notesInput">Notes (optional)</label>
+        <textarea id="notesInput" placeholder="Any additional notes…"></textarea>
+      </div>
+      <button class="btn btn-blue btn-full" id="submitBtn" onclick="doSubmit()" disabled>
+        Submit Entry
+      </button>
+      <div id="submitMsg"></div>
+
+      <div class="cal-note" id="calNote" style="display:none;">
+        <span class="cal-note-icon">📅</span>
+        <span>Approved entries will be added automatically to your team's shared Google Calendar.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-history">
+    <div id="myLogsList">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-msg">No entries yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-dashboard">
+    <div id="pendingSection" style="display:none; margin-bottom:22px;">
+      <div class="section-label">Pending Requests</div>
+      <div id="pendingList"></div>
+    </div>
+
+    <div id="pendingHandoverSection" style="display:none; margin-bottom:22px;">
+      <div class="section-label">Pending Handovers</div>
+      <div id="pendingHandoverList"></div>
+    </div>
+
+    <div class="section-label">Teacher Balances</div>
+    <div style="font-size:0.72rem; color:var(--muted); margin:-6px 0 10px;">Tap a row for Annual Leave / Sick Day breakdown</div>
+    <div class="bal-table">
+      <div class="bt-row bt-head">
+        <div class="bt-chevron"></div>
+        <div class="bt-cell bt-name">Name</div>
+        <div class="bt-cell">Earned</div>
+        <div class="bt-cell">Used</div>
+        <div class="bt-cell">Pending</div>
+        <div class="bt-cell bt-bal">Total</div>
+      </div>
+      <div id="balanceRows">
+        <div style="padding:20px; text-align:center; color:var(--muted); font-size:0.82rem;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-teamhistory">
+  <div class="hist-filter-row">
+    <button class="hist-filter-btn active" id="hist-btn-all" onclick="filterTeamHistory('all')">All</button>
+    <button class="hist-filter-btn" id="hist-btn-overtime" onclick="filterTeamHistory('Overtime Compensation')">🗓️ Overtime Comp</button>
+    <button class="hist-filter-btn" id="hist-btn-leave" onclick="filterTeamHistory('Leave Request')">🌴 Leave Request</button>
+    <select class="hist-member-filter" id="hist-member-filter" onchange="filterTeamHistory()">
+      <option value="">All Members</option>
+    </select>
+  </div>
+  <div id="teamHistList">
+    <div class="empty-state">
+      <div class="empty-icon">📚</div>
+      <div class="empty-msg">Loading team history…</div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="panel-import">
+    <div class="card">
+      <div class="card-title">Log Historical Entry</div>
+      <p style="font-size:0.78rem; color:var(--muted); margin-bottom:16px; line-height:1.6;">
+        Log past overtime compensation or approved leave directly. No emails sent, no approval flow. Entries are immediately approved and count toward the balance of their respective year.
+      </p>
+
+      <div class="field">
+        <label for="impName">Team Member</label>
+        <select id="impName" onchange="updateImportButton()">
+          <option value="">— Select member —</option>
+        </select>
+      </div>
+
+      <div class="type-grid" id="impTypeGrid" style="margin-bottom:14px; grid-template-columns: 1fr 1fr;">
+        <button class="type-card" id="imp-type-overtime" onclick="selectImportType('Overtime Compensation')">
+          <span class="tc-icon">🗓️</span>
+          <div class="tc-name">Overtime Compensation</div>
+          <div class="tc-desc">Past weekend workday</div>
+        </button>
+        <button class="type-card" id="imp-type-leave" onclick="selectImportType('Leave Request')">
+          <span class="tc-icon">🌴</span>
+          <div class="tc-name">Leave (Approved)</div>
+          <div class="tc-desc">Past approved leave</div>
+        </button>
+        <button class="type-card" id="imp-type-leavecredit" onclick="selectImportType('Leave Allowance')" style="grid-column: 1 / -1;">
+          <span class="tc-icon">💳</span>
+          <div class="tc-name">Leave Allowance (Rollover Credit)</div>
+          <div class="tc-desc">Manually credit a prior year's leave balance — mirrors how Overtime Compensation works for the comp bucket</div>
+        </button>
+      </div>
+
+      <div class="field" id="impSubtypeField" style="display:none; margin-bottom:14px;">
+        <label for="impSubtype">Leave Type</label>
+        <select id="impSubtype">
+          <option value="Annual Leave">Annual Leave (12 days/year — Batch 1)</option>
+          <option value="Sick Day">Sick Day (doctor letter required for 2+ consecutive days)</option>
+        </select>
+      </div>
+
+      <div id="impCreditSection" style="display:none;">
+        <div class="field">
+          <label for="impCreditYear">Year</label>
+          <input type="number" id="impCreditYear" placeholder="e.g. 2025" min="2000" max="2100" step="1" oninput="updateImportButton()">
+        </div>
+        <div class="field">
+          <label for="impCreditDays">Days to Credit</label>
+          <input type="number" id="impCreditDays" placeholder="e.g. 2.5" min="0.5" step="0.5" oninput="updateImportButton()">
+        </div>
+        <div class="field-desc" style="margin-top:-6px;">This adds a leave-day credit for that year — it will show as rollover once the current policy year compares it against any Leave Days used that year.</div>
+      </div>
+
+      <div id="impDateSection" style="display:none;">
+        <div class="field">
+          <label>Selected Dates</label>
+          <div class="chip-area" id="impDateChips">
+            <span class="chip-empty">No dates selected yet</span>
+          </div>
+          <div class="add-date-row">
+            <input type="date" id="impDatePickerInput" class="field" style="margin-bottom:0;">
+            <button class="btn-add-date" onclick="addImportDate()">+ Add</button>
+          </div>
+        </div>
+
+        <label class="half-day-row" id="impHalfDayRow" onclick="toggleImportHalfDay()">
+          <input type="checkbox" id="impHalfDayCheck" onclick="event.stopPropagation(); toggleImportHalfDay()">
+          <div>
+            <div class="hd-label">Half-day</div>
+            <div class="hd-desc">Counts as 0.5 days</div>
+          </div>
+        </label>
+      </div>
+
+      <div class="field" id="impNotesField" style="margin-top:12px;">
+        <label for="impNotes">Details</label>
+        <div class="field-desc" id="impNotesDesc">Nama Event + Hari &amp; Waktu + Peran, e.g. "Webinar TPA, Sabtu 9–11am, sebagai moderator"</div>
+        <textarea id="impNotes" placeholder="Add event details…"></textarea>
+      </div>
+
+      <button class="btn btn-blue btn-full" id="impSubmitBtn" onclick="doImport()" disabled style="margin-top:14px;">
+        Log Historical Entry
+      </button>
+      <div id="impMsg" style="font-size:0.77rem; margin-top:8px; min-height:1.1rem;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+const SCRIPT_URL = 'PASTE_AGKB_SCRIPT_URL_HERE';
+
+const session = {
+  sheetId: '', name: '', role: '', pin: '',
+  balance: null, teamData: null, hasCalendar: false,
+};
+
+let selectedType        = 'Leave Request';
+let selectedDates       = [];
+let isHalfDay           = false;
+let allMembers          = [];
+let pendingHandoverEntry = null;
+let holidays            = [];
+let selectedImportDates = [];
+let isImportHalfDay     = false;
+let importType          = null;
+
+const $       = id => document.getElementById(id);
+const esc     = s  => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtDate = d  => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—';
+
+const showLoader  = (t='Loading…') => { $('loaderText').textContent = t; $('loader').classList.add('show'); };
+const hideLoader  = ()              => $('loader').classList.remove('show');
+const showAlert   = (msg, icon='ℹ️') => { $('alertIcon').textContent = icon; $('alertMsg').textContent = msg; $('alertModal').classList.add('show'); };
+const closeAlert  = ()              => $('alertModal').classList.remove('show');
+
+async function api(action, extra = {}) {
+  try {
+    const payload = {
+      action,
+      sheetId: extra.sheetId || session.sheetId,
+      name:    extra.name    !== undefined ? extra.name    : session.name,
+      pin:     extra.pin     !== undefined ? extra.pin     : session.pin,
+      ...extra,
+    };
+    const body = new URLSearchParams();
+    for (const [k, v] of Object.entries(payload)) {
+      body.append(k, typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v ?? ''));
+    }
+    const res  = await fetch(SCRIPT_URL, { method: 'POST', body });
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch(e) {
+      console.error(`[API] JSON parse failed for ${action}:`, text.slice(0,500));
+      return { success: false, message: 'Invalid response from server. See console.' };
+    }
+  } catch(err) {
+    console.error(`[API] fetch failed for ${action}:`, err);
+    return { success: false, message: err.message };
+  }
+}
+
+// ── Staff History (Chief only) ─────────────────────────────────────────────────
+let _teamHistData = null;
+let _histActiveFilter = 'all';
+
+async function loadTeamHistory() {
+  const list = $('teamHistList');
+  list.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto;"></div></div>';
+  const res = await api('getTeamLogs');
+  if (!res.success) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-msg">' + esc(res.message || 'Failed to load.') + '</div></div>';
+    return;
+  }
+  _teamHistData = res;
+  const sel = $('hist-member-filter');
+  const allNames = [...new Set([
+    ...(res.overtimeLogs || []).map(l => l.name),
+    ...(res.leaveLogs || []).map(l => l.name)
+  ])].sort();
+  sel.innerHTML = '<option value="">All Members</option>' + allNames.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+  renderTeamHistory();
+}
+
+function filterTeamHistory(type) {
+  if (type !== undefined) {
+    _histActiveFilter = type;
+    document.querySelectorAll('.hist-filter-btn').forEach(b => b.classList.remove('active'));
+    $('hist-btn-' + (type === 'all' ? 'all' : type === 'Overtime Compensation' ? 'overtime' : 'leave')).classList.add('active');
+  }
+  renderTeamHistory();
+}
+
+function renderTeamHistory() {
+  if (!_teamHistData) return;
+  const list = $('teamHistList');
+  const memberFilter = $('hist-member-filter').value;
+
+  let logs = [];
+  if (_histActiveFilter === 'all' || _histActiveFilter === 'Overtime Compensation') {
+    logs = logs.concat((_teamHistData.overtimeLogs || []).map(l => ({ ...l, type: l.type || 'Overtime Compensation' })));
+  }
+  if (_histActiveFilter === 'all' || _histActiveFilter === 'Leave Request') {
+    logs = logs.concat((_teamHistData.leaveLogs || []).map(l => ({ ...l, type: l.type || 'Leave Request' })));
+  }
+
+  if (memberFilter) {
+    logs = logs.filter(l => l.name === memberFilter);
+  }
+
+  logs.sort((a, b) => {
+    const da = a.timestamp || a.startDate || '';
+    const db = b.timestamp || b.startDate || '';
+    return db.localeCompare(da);
+  });
+
+  if (!logs.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-msg">No entries found.</div></div>';
+    return;
+  }
+
+  list.innerHTML = logs.map(log => {
+    const icon = log.type === 'Overtime Compensation' ? '🗓️' : log.type === 'Leave Allowance' ? '💳' : '🌴';
+    const subtypeBadge = log.type === 'Leave Request' && log.entrySubtype
+      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Leave' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Leave' ? 'Leave Day' : 'Comp Day') + '</span>'
+      : '';
+    const datesStr = log.dates && log.dates.length > 0
+      ? log.dates.length === 1 ? fmtDate(log.dates[0]) : fmtDate(log.dates[0]) + ' – ' + fmtDate(log.dates[log.dates.length - 1])
+      : fmtDate(log.startDate) + (log.endDate && log.endDate !== log.startDate ? ' – ' + fmtDate(log.endDate) : '');
+    const statusPill = log.status === 'APPROVED' ? 'pill-approved' : log.status === 'PENDING' ? 'pill-pending' : 'pill-rejected';
+    const dayVal = log.dayValue !== undefined && log.dayValue !== null ? log.dayValue : '';
+
+    return '<div class="log-item">' +
+      '<div class="log-icon">' + icon + '</div>' +
+      '<div class="log-body">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">' +
+          '<div class="log-type">' + esc(log.name) + ' · ' + log.type + '</div>' +
+          subtypeBadge +
+          '<span class="status-pill ' + statusPill + '">' + log.status + '</span>' +
+        '</div>' +
+        '<div class="log-meta">' + datesStr + (dayVal ? ' · ' + dayVal + ' day' + (dayVal !== 1 ? 's' : '') : '') + (log.halfDay ? ' <span class="status-pill pill-halfday" style="margin-left:4px;">Half-day</span>' : '') + '</div>' +
+        (log.notes ? '<div class="log-notes">' + esc(log.notes) + '</div>' : '') +
+        (log.reviewedBy ? '<div class="log-reviewer">Reviewed by ' + esc(log.reviewedBy) + '</div>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function checkUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const sheetId = params.get('sheetId');
+  if (sheetId) {
+    $('loginSheetId').value = sheetId;
+    onSheetIdInput(sheetId);
+  }
+}
+
+let _sheetIdDebounce = null;
+let _lastFetchedSheetId = '';
+
+function onSheetIdInput(value) {
+  const sheetId = (value || '').trim();
+  clearTimeout(_sheetIdDebounce);
+
+  // Reset name dropdown if the field is cleared or changed after a successful fetch
+  if (sheetId !== _lastFetchedSheetId) {
+    $('loginName').innerHTML = '<option value="">— Select your name —</option>';
+    $('inlinePinWrap').classList.remove('show');
+    $('loginBtn').disabled = true;
+  }
+
+  if (sheetId.length < 15) {
+    $('sheetIdStatus').textContent = '';
+    return;
+  }
+
+  $('sheetIdStatus').innerHTML = '<span style="font-size:0.7rem; color:var(--muted);">Looking up team…</span>';
+
+  _sheetIdDebounce = setTimeout(async () => {
+    const res = await api('getTeam', { sheetId });
+    if (sheetId !== $('loginSheetId').value.trim()) return; // field changed while waiting
+
+    if (!res.success || !res.members || !res.members.length) {
+      $('sheetIdStatus').innerHTML = '<span style="font-size:0.7rem; color:var(--red);">⚠️ ' + esc(res.message || 'Could not find a Team sheet at this ID.') + '</span>';
+      return;
+    }
+
+    _lastFetchedSheetId = sheetId;
+    session.teamData = res.members;
+    allMembers = res.members.map(m => m.name);
+
+    $('loginName').innerHTML = '<option value="">— Select your name —</option>' +
+      res.members.map(m => '<option value="' + esc(m.name) + '">' + esc(m.name) + '</option>').join('');
+
+    $('sheetIdStatus').innerHTML = '<span style="font-size:0.7rem; color:var(--green);">✓ Found ' + res.members.length + ' team member' + (res.members.length !== 1 ? 's' : '') + '</span>';
+  }, 500);
+}
+
+async function doLogin() {
+  const sheetId = $('loginSheetId').value.trim();
+  const name = $('loginName').value.trim();
+  const pin = $('inlinePin').value.trim();
+
+  if (!sheetId || !name) {
+    showAlert('Please fill in all fields.', '⚠️');
+    return;
+  }
+
+  const teamRow = session.teamData?.find(m => m.name.toLowerCase() === name.toLowerCase());
+  const isChief = teamRow?.role === 'Head of School';
+
+  showLoader('Logging in…');
+  const res = await api('getConfig', { sheetId });
+  hideLoader();
+
+  if (!res.success) {
+    showAlert(res.message || 'Login failed.', '❌');
+    return;
+  }
+
+  // PIN is only required for Chiefs, not for every login on a PIN-protected sheet
+  if (isChief && res.config.HAS_PIN === 'true' && !pin) {
+    showAlert('PIN required.', '⚠️');
+    return;
+  }
+
+  session.sheetId = sheetId;
+  session.name = name;
+  session.pin = pin;
+
+  if (res.config.HOLIDAYS) {
+    holidays = res.config.HOLIDAYS.split(',').map(s => s.trim()).filter(s => s.length === 10);
+  }
+
+  if (res.config.HAS_CALENDAR === 'true') {
+    session.hasCalendar = true;
+  }
+
+  showLoader('Loading dashboard…');
+  const teamRes = await api('getTeam');
+  if (teamRes.success) {
+    session.teamData = teamRes.members;
+    allMembers = teamRes.members.map(m => m.name);
+  }
+
+  const dashRes = await api('getTeamDashboard');
+  hideLoader();
+
+  if (!dashRes.success) {
+    showAlert(dashRes.message || 'Failed to load dashboard.', '❌');
+    return;
+  }
+
+  const reqRole = teamRes.members?.find(m => m.name.toLowerCase() === name.toLowerCase())?.role || 'Member';
+  session.role = reqRole;
+
+  if (reqRole === 'Head of School') {
+    $('tab-import').style.display = 'inline-flex';
+    $('tab-teamhistory').style.display = 'inline-flex';
+  }
+
+  $('loginScreen').style.display = 'none';
+  $('mainApp').style.display = 'block';
+  $('headerName').textContent = name;
+
+  if (session.teamData) {
+    $('impName').innerHTML = '<option value="">— Select member —</option>' +
+      session.teamData.map(m => '<option value="' + esc(m.name) + '">' + esc(m.name) + '</option>').join('');
+  }
+
+  loadMyBalance(dashRes);
+  loadMyHistory();
+  loadDashboard();
+  setTimeout(() => selectType('Leave Request'), 100);
+
+  if (session.hasCalendar) {
+    $('calNote').style.display = 'flex';
+  }
+}
+
+function doLogout() {
+  session.sheetId = '';
+  session.name = '';
+  session.pin = '';
+  session.role = '';
+  selectedType = 'Leave Request';
+  selectedDates = [];
+  selectedImportDates = [];
+
+  $('tab-teamhistory').style.display = 'none';
+  $('tab-import').style.display = 'none';
+  $('loginScreen').style.display = 'flex';
+  $('mainApp').style.display = 'none';
+  $('loginSheetId').value = '';
+  $('loginName').value = '';
+  $('inlinePin').value = '';
+  $('leaveSubtype').value = 'Day Off';
+  $('notesInput').value = '';
+  $('impName').value = '';
+  $('impNotes').value = '';
+}
+
+function onNameSelect(name) {
+  const teamRow = session.teamData?.find(m => m.name.toLowerCase() === name.toLowerCase());
+  const isChief = teamRow?.role === 'Head of School';
+
+  if (isChief) {
+    $('inlinePinWrap').classList.add('show');
+  } else {
+    $('inlinePinWrap').classList.remove('show');
+  }
+
+  const sheetId = $('loginSheetId').value.trim();
+  const pin = $('inlinePin').value.trim();
+  $('loginBtn').disabled = !sheetId || !name || (isChief && !pin);
+}
+
+function selectType(type) {
+  selectedType = 'Leave Request';
+  selectedDates = [];
+  isHalfDay = false;
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+  const lc = $('type-leave');
+  if (lc) lc.classList.add('selected');
+  $('dateSection').style.display = 'block';
+  $('leaveSubtypeField').style.display = '';
+  $('leaveSubtype').value = 'Annual Leave';
+  $('notesField').style.display = 'none';
+  if ($('driveLinkField')) $('driveLinkField').style.display = 'none';
+  if ($('driveLinkInput')) $('driveLinkInput').value = '';
+  renderDateChips();
+  updateSubmitButton();
+}
+
+function renderDateChips() {
+  const chips = $('dateChips');
+  chips.innerHTML = '';
+
+  if (selectedDates.length === 0) {
+    chips.innerHTML = '<span class="chip-empty">No dates selected yet</span>';
+  } else {
+    selectedDates.forEach(d => {
+      const chip = document.createElement('div');
+      chip.className = 'date-chip';
+      chip.innerHTML = `${fmtDate(d)} <button onclick="removeDate('${d}')">✕</button>`;
+      chips.appendChild(chip);
+    });
+  }
+
+  updateDateSummary();
+}
+
+function addDate() {
+  const input = $('datePickerInput');
+  const dateStr = input.value.trim();
+
+  if (!dateStr) {
+    showAlert('Please select a date.', '⚠️');
+    return;
+  }
+
+  if (selectedType !== 'Overtime Compensation' && holidays.includes(dateStr)) {
+    showAlert(`${fmtDate(dateStr)} is a public holiday and cannot be selected.`, '⚠️');
+    input.value = '';
+    return;
+  }
+
+  if (selectedDates.includes(dateStr)) {
+    showAlert('This date is already selected.', '⚠️');
+    input.value = '';
+    return;
+  }
+
+  selectedDates.push(dateStr);
+  selectedDates.sort();
+  input.value = '';
+  renderDateChips();
+  updateDriveLinkVisibility();
+  updateSubmitButton();
+}
+
+function removeDate(dateStr) {
+  selectedDates = selectedDates.filter(d => d !== dateStr);
+  renderDateChips();
+  updateSubmitButton();
+}
+
+function updateDateSummary() {
+  const summary = $('dateSummary');
+  if (selectedDates.length === 0) {
+    summary.textContent = '';
+  } else if (selectedDates.length === 1) {
+    summary.textContent = `1 date selected: ${fmtDate(selectedDates[0])}`;
+  } else {
+    summary.textContent = `${selectedDates.length} dates selected`;
+  }
+}
+
+function toggleHalfDay() {
+  isHalfDay = !isHalfDay;
+  $('halfDayRow').classList.toggle('on');
+  $('halfDayCheck').checked = isHalfDay;
+  updateSubmitButton();
+}
+
+function updateSubmitButton() {
+  const hasType  = !!selectedType;
+  const hasDates = selectedDates.length > 0;
+  const isSick   = $('leaveSubtype') && $('leaveSubtype').value === 'Sick Day';
+  const need2Doc = isSick && selectedDates.length >= 2;
+  const driveVal = $('driveLinkInput') ? $('driveLinkInput').value.trim() : '';
+  const hasDoc   = !need2Doc || /^https:\/\/(drive|docs)\.google\.com\//.test(driveVal);
+  $('submitBtn').disabled = !hasType || !hasDates || !hasDoc;
+}
+
+
+function onLeaveSubtypeChange() {
+  updateDriveLinkVisibility();
+  updateSubmitButton();
+}
+
+function updateDriveLinkVisibility() {
+  const isSick = $('leaveSubtype') && $('leaveSubtype').value === 'Sick Day';
+  const need = isSick && selectedDates.length >= 2;
+  if ($('driveLinkField')) $('driveLinkField').style.display = need ? '' : 'none';
+  if (!need && $('driveLinkInput')) $('driveLinkInput').value = '';
+}
+
+async function doSubmit() {
+  if (!selectedType || selectedDates.length === 0) {
+    showAlert('Please complete the form.', '⚠️');
+    return;
+  }
+
+  const notes = $('notesInput').value.trim();
+  const subtype = $('leaveSubtype') ? $('leaveSubtype').value : 'Annual Leave';
+  const driveLink = $('driveLinkInput') ? $('driveLinkInput').value.trim() : '';
+
+  const entry = {
+    name: session.name,
+    type: selectedType,
+    entrySubtype: subtype,
+    dates: selectedDates,
+    halfDay: isHalfDay,
+    notes: notes,
+  };
+
+  showLoader('Submitting…');
+  const res = await api('submitEntry', { entry });
+  hideLoader();
+
+  if (!res.success) {
+    showAlert(res.message || 'Submission failed.', '❌');
+    return;
+  }
+
+  const statusMsg = res.status === 'APPROVED'
+    `✓ Submitted — pending Head of School approval (${res.dayValue} days)`;
+  $('submitMsg').textContent = statusMsg;
+  $('submitMsg').style.color = 'var(--green)';
+
+  selectedType = 'Leave Request';
+  selectedDates = [];
+  isHalfDay = false;
+  document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+  $('dateSection').style.display = 'none';
+  $('notesInput').value = '';
+  $('halfDayCheck').checked = false;
+  $('halfDayRow').classList.remove('on');
+  $('submitBtn').disabled = true;
+
+  setTimeout(async () => {
+    const teamRes = await api('getTeam');
+    if (teamRes.success) session.teamData = teamRes.members;
+    loadMyBalance({ members: session.teamData || [] });
+    loadMyHistory();
+  }, 1000);
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  $(`panel-${tab}`).classList.add('active');
+  $(`tab-${tab}`).classList.add('active');
+
+  if (tab === 'dashboard') {
+    loadDashboard();
+  }
+
+  if (tab === 'teamhistory') {
+    loadTeamHistory();
+  }
+}
+
+async function loadMyBalance(dashRes) {
+  if (!session.teamData) return;
+  const me = session.teamData.find(m => m.name.toLowerCase() === session.name.toLowerCase());
+  if (!me) return;
+  const bal = me.balance;
+
+  // ── Total panel: sum of both independent buckets ──
+  const totalVal = $('panelTotalVal');
+  const totalLeft = bal.compBalance + bal.leaveBalance;
+  totalVal.textContent = totalLeft.toFixed(1);
+  totalVal.className = 'bal-panel-val';
+  if (totalLeft < 0) totalVal.classList.add('danger');
+  else if (totalLeft <= 1) totalVal.classList.add('warn');
+
+  const totalGained = bal.monthlyAlloc + bal.rolloverDays + bal.compDays + bal.compRollover;
+  const totalUsed   = bal.leaveUsedDays + bal.compUsedDays;
+  $('panelTotalSub').textContent = bal.compUsedDays + ' comp · ' + bal.leaveUsedDays + ' leave used' +
+    ((bal.pendingDays + bal.compPendingDays) > 0 ? ' · ' + (bal.pendingDays + bal.compPendingDays) + ' pending' : '');
+  $('panelTotalGained').textContent = '+' + totalGained;
+  $('panelTotalUsedB').textContent = '-' + totalUsed;
+
+  const rolloverEl = $('panelRolloverPills');
+  if (bal.rolloverBreakdown && bal.rolloverBreakdown.length > 0) {
+    rolloverEl.innerHTML = bal.rolloverBreakdown.map(r =>
+      '<span class="pill-rollover">+' + r.days + ' ' + (r.bucket === 'comp' ? 'comp' : 'leave') + ' ' + r.year + '</span>'
+    ).join('');
+  } else {
+    rolloverEl.innerHTML = '';
+  }
+
+  // ── Leave Balance panel: Leave bucket only ──
+  const monthlyVal = $('panelMonthlyVal');
+  monthlyVal.textContent = bal.leaveBalance.toFixed(1);
+  monthlyVal.className = 'bal-panel-val';
+  if (bal.leaveBalance < 0) monthlyVal.classList.add('danger');
+  else if (bal.leaveBalance <= 1) monthlyVal.classList.add('warn');
+  $('panelMonthlySub').textContent = bal.leaveUsedDays + ' leave day' + (bal.leaveUsedDays !== 1 ? 's' : '') + ' used' +
+    (bal.rolloverDays > 0 ? ' · +' + bal.rolloverDays + ' rollover' : '');
+  $('panelMonthlyGained').textContent = '+' + (bal.monthlyAlloc + bal.rolloverDays);
+  $('panelMonthlyUsedB').textContent = '-' + bal.leaveUsedDays;
+
+  // ── Overtime Comp panel: Comp bucket only ──
+  const otVal = $('panelOTVal');
+  const compLeft = bal.compBalance;
+  otVal.textContent = compLeft.toFixed(1);
+  otVal.className = 'bal-panel-val';
+  if (compLeft < 0) otVal.classList.add('danger');
+  $('panelOTSub').textContent = bal.compUsedDays + ' comp day' + (bal.compUsedDays !== 1 ? 's' : '') + ' used' +
+    (bal.compRollover > 0 ? ' · +' + bal.compRollover + ' rollover' : '');
+  $('panelOTGained').textContent = '+' + (bal.compDays + bal.compRollover);
+  $('panelOTUsedB').textContent = '-' + bal.compUsedDays;
+}
+
+function selectImportType(type) {
+  importType = type;
+  document.querySelectorAll('#panel-import .type-card').forEach(c => c.classList.remove('selected'));
+
+  // Reset all conditional sections first
+  $('impSubtypeField').style.display = 'none';
+  $('impDateSection').style.display = 'none';
+  $('impCreditSection').style.display = 'none';
+  $('impNotesField').style.display = '';
+
+  if (type === 'Overtime Compensation') {
+    $('imp-type-overtime').classList.add('selected');
+    $('impDateSection').style.display = 'block';
+  } else if (type === 'Leave Request') {
+    $('imp-type-leave').classList.add('selected');
+    $('impSubtypeField').style.display = '';
+    $('impSubtype').value = 'Day Off';
+    $('impDateSection').style.display = 'block';
+    $('impNotesField').style.display = 'none';
+    $('impNotes').value = '';
+  } else if (type === 'Leave Allowance') {
+    $('imp-type-leavecredit').classList.add('selected');
+    $('impCreditSection').style.display = 'block';
+    $('impCreditYear').value = '';
+    $('impCreditDays').value = '';
+  }
+
+  selectedImportDates = [];
+  isImportHalfDay = false;
+  renderImportDateChips();
+  updateImportButton();
+}
+
+function renderImportDateChips() {
+  const chips = $('impDateChips');
+  chips.innerHTML = '';
+
+  if (selectedImportDates.length === 0) {
+    chips.innerHTML = '<span class="chip-empty">No dates selected yet</span>';
+  } else {
+    selectedImportDates.forEach(d => {
+      const chip = document.createElement('div');
+      chip.className = 'date-chip';
+      chip.innerHTML = `${fmtDate(d)} <button onclick="removeImportDate('${d}')">✕</button>`;
+      chips.appendChild(chip);
+    });
+  }
+}
+
+function addImportDate() {
+  const input = $('impDatePickerInput');
+  const dateStr = input.value.trim();
+
+  if (!dateStr) {
+    showAlert('Please select a date.', '⚠️');
+    return;
+  }
+
+  if (importType !== 'Overtime Compensation' && holidays.includes(dateStr)) {
+    showAlert(`${fmtDate(dateStr)} is a public holiday and cannot be selected.`, '⚠️');
+    input.value = '';
+    return;
+  }
+
+  if (selectedImportDates.includes(dateStr)) {
+    showAlert('This date is already selected.', '⚠️');
+    input.value = '';
+    return;
+  }
+
+  selectedImportDates.push(dateStr);
+  selectedImportDates.sort();
+  input.value = '';
+  renderImportDateChips();
+  updateImportButton();
+}
+
+function removeImportDate(dateStr) {
+  selectedImportDates = selectedImportDates.filter(d => d !== dateStr);
+  renderImportDateChips();
+  updateImportButton();
+}
+
+function toggleImportHalfDay() {
+  isImportHalfDay = !isImportHalfDay;
+  $('impHalfDayRow').classList.toggle('on');
+  $('impHalfDayCheck').checked = isImportHalfDay;
+  updateImportButton();
+}
+
+function updateImportButton() {
+  const hasType = importType !== null;
+  const hasMember = $('impName').value.trim() !== '';
+  let hasRequiredFields;
+  if (importType === 'Leave Allowance') {
+    const year = parseInt($('impCreditYear').value, 10);
+    const days = parseFloat($('impCreditDays').value);
+    hasRequiredFields = !!year && !isNaN(days) && days > 0;
+  } else {
+    hasRequiredFields = selectedImportDates.length > 0;
+  }
+  $('impSubmitBtn').disabled = !hasType || !hasMember || !hasRequiredFields;
+}
+
+async function doImport() {
+  const member = $('impName').value.trim();
+  const notes = $('impNotes').value.trim();
+
+  if (!member || !importType) {
+    showAlert('Please complete the form.', '⚠️');
+    return;
+  }
+
+  let entry;
+  if (importType === 'Leave Allowance') {
+    const year = parseInt($('impCreditYear').value, 10);
+    const days = parseFloat($('impCreditDays').value);
+    if (!year || isNaN(days) || days <= 0) {
+      showAlert('Please enter a valid year and number of days.', '⚠️');
+      return;
+    }
+    entry = {
+      name: member,
+      type: importType,
+      year: year,
+      days: days,
+      notes: notes,
+      importedBy: session.name,
+    };
+  } else {
+    if (selectedImportDates.length === 0) {
+      showAlert('Please complete the form.', '⚠️');
+      return;
+    }
+    entry = {
+      name: member,
+      type: importType,
+      entrySubtype: importType === 'Leave Request' ? $('impSubtype').value : null,
+      dates: selectedImportDates,
+      halfDay: isImportHalfDay,
+      notes: notes,
+      importedBy: session.name,
+    };
+  }
+
+  showLoader('Importing…');
+  const res = await api('importEntry', { entry });
+  hideLoader();
+
+  if (!res.success) {
+    showAlert(res.message || 'Import failed.', '❌');
+    return;
+  }
+
+  $('impMsg').textContent = `✓ Imported (${res.dayValue} days)`;
+  $('impMsg').style.color = 'var(--green)';
+
+  $('impName').value = '';
+  $('impNotes').value = '';
+  $('impCreditYear').value = '';
+  $('impCreditDays').value = '';
+  importType = null;
+  selectedImportDates = [];
+  isImportHalfDay = false;
+  document.querySelectorAll('#panel-import .type-card').forEach(c => c.classList.remove('selected'));
+  $('impDateSection').style.display = 'none';
+  $('impSubtypeField').style.display = 'none';
+  $('impCreditSection').style.display = 'none';
+  $('impHalfDayCheck').checked = false;
+  $('impHalfDayRow').classList.remove('on');
+  $('impSubmitBtn').disabled = true;
+  renderImportDateChips();
+
+  setTimeout(() => loadDashboard(), 1000);
+}
+
+function toggleHowTo(id) {
+  $(id).classList.toggle('open');
+}
+
+function toggleChief() {
+  $('chiefPanel').classList.toggle('open');
+}
+
+function generateLink() {
+  const sheetId = $('genSheetId').value.trim();
+  if (!sheetId) {
+    showAlert('Please enter the spreadsheet ID.', '⚠️');
+    return;
+  }
+
+  const url = `${window.location.origin}${window.location.pathname}?sheetId=${sheetId}`;
+  $('generatedLink').textContent = url;
+  $('generatedLink').style.display = 'block';
+  $('copyLinkBtn').style.display = 'block';
+}
+
+function copyLink() {
+  const url = $('generatedLink').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    showAlert('Link copied!', '✓');
+  });
+}
+
+function closeHandoverModal() {
+  $('handoverModal').classList.remove('show');
+}
+
+function openHandoverModal(id, name, dateStr) {
+  pendingHandoverEntry = { id, name, dateStr };
+  $('handoverModalSub').textContent = `Your leave (${dateStr}) has been approved. Please fill in this handover so your team knows what's in progress while you're out.`;
+  $('ho-tasks').value = '';
+  $('ho-contact').value = '';
+  $('ho-urgent').value = '';
+  $('ho-drive').value = '';
+  $('ho-notes').value = '';
+  $('handoverFormError').textContent = '';
+  $('handoverModal').classList.add('show');
+}
+
+async function submitHandover() {
+  if (!pendingHandoverEntry) return;
+
+  const tasks = $('ho-tasks').value.trim();
+  const contact = $('ho-contact').value.trim();
+  const driveLink = $('ho-drive').value.trim();
+
+  if (!tasks || !contact) {
+    $('handoverFormError').textContent = 'Tasks and point of contact are required.';
+    return;
+  }
+
+  if (driveLink && !/^https:\/\/(drive|docs)\.google\.com\//.test(driveLink)) {
+    $('handoverFormError').textContent = 'Drive link should be a valid Google Drive/Docs URL.';
+    return;
+  }
+
+  const handover = {
+    tasks, contact,
+    urgent: $('ho-urgent').value.trim(),
+    driveLink,
+    notes: $('ho-notes').value.trim(),
+  };
+
+  showLoader('Submitting…');
+  const res = await api('submitHandover', {
+    id: pendingHandoverEntry.id,
+    handover,
+  });
+  hideLoader();
+
+  if (!res.success) {
+    showAlert(res.message || 'Submission failed.', '❌');
+    return;
+  }
+
+  closeHandoverModal();
+  loadMyHistory();
+}
+
+// ── My History tab ─────────────────────────────────────────────────────────────
+// Shows an urgent banner on the Submit tab if the person has any approved
+// leave still awaiting their own handover note. Uses the same logs already
+// fetched by loadMyHistory — no extra API call.
+function renderHandoverBanner(logs) {
+  const banner = $('handoverBanner');
+  const pending = (logs || []).filter(l => l.status === 'APPROVED' && l.type === 'Leave Request' && l.handover === 'PENDING_HANDOVER');
+
+  if (pending.length === 0) {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    return;
+  }
+
+  // Most recently approved one first if there's more than one
+  const next = pending[0];
+  const datesStr = next.dates && next.dates.length > 0
+    ? (next.dates.length === 1 ? fmtDate(next.dates[0]) : fmtDate(next.dates[0]) + ' – ' + fmtDate(next.dates[next.dates.length - 1]))
+    : fmtDate(next.startDate) + (next.endDate && next.endDate !== next.startDate ? ' – ' + fmtDate(next.endDate) : '');
+  const extraCount = pending.length - 1;
+
+  banner.innerHTML =
+    '<span class="handover-banner-icon">🗂️</span>' +
+    '<div class="handover-banner-body">' +
+      '<div class="handover-banner-title">Handover Notice Required</div>' +
+      '<div class="handover-banner-desc">Your leave (' + datesStr + ') has been approved. Please submit a handover before your leave begins' +
+        (extraCount > 0 ? ' — you also have ' + extraCount + ' more pending.' : '.') +
+      '</div>' +
+      '<button class="btn btn-amber btn-sm" onclick="openHandoverModal(\'' + next.id + '\', \'' + esc(session.name) + '\', \'' + datesStr.replace(/'/g, "\\'") + '\')">Submit Handover</button>' +
+    '</div>';
+  banner.style.display = 'flex';
+}
+
+async function loadMyHistory() {
+  const list = $('myLogsList');
+  list.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto;"></div></div>';
+  const res = await api('getMyLogs');
+  if (!res.success || !res.logs || !res.logs.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-msg">No entries yet.</div></div>';
+    renderHandoverBanner([]);
+    return;
+  }
+
+  renderHandoverBanner(res.logs);
+
+  list.innerHTML = res.logs.map(log => {
+    const icon = log.type === 'Overtime Compensation' ? '🗓️' : log.type === 'Leave Allowance' ? '💳' : '🌴';
+    const subtypeBadge = log.type === 'Leave Request' && log.entrySubtype
+      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Leave' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Leave' ? 'Leave Day' : 'Comp Day') + '</span>'
+      : '';
+    const datesStr = log.dates && log.dates.length > 0
+      ? log.dates.length === 1 ? fmtDate(log.dates[0]) : fmtDate(log.dates[0]) + ' – ' + fmtDate(log.dates[log.dates.length - 1])
+      : fmtDate(log.startDate) + (log.endDate && log.endDate !== log.startDate ? ' – ' + fmtDate(log.endDate) : '');
+    const statusPill = log.status === 'APPROVED' ? 'pill-approved' : log.status === 'PENDING' ? 'pill-pending' : 'pill-rejected';
+    const dayVal = log.dayValue !== undefined && log.dayValue !== null ? log.dayValue : '';
+
+    // Handover prompt for the employee's own approved leave still needing handover
+    const needsHandover = log.status === 'APPROVED' && log.type === 'Leave Request' && log.handover === 'PENDING_HANDOVER';
+    const handoverDone  = log.status === 'APPROVED' && log.type === 'Leave Request' && log.handover && log.handover !== 'PENDING_HANDOVER';
+
+    return '<div class="log-item">' +
+      '<div class="log-icon">' + icon + '</div>' +
+      '<div class="log-body">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">' +
+          '<div class="log-type">' + log.type + '</div>' +
+          subtypeBadge +
+          '<span class="status-pill ' + statusPill + '">' + log.status + '</span>' +
+          (handoverDone ? '<span class="status-pill pill-handover">Handover Done</span>' : '') +
+        '</div>' +
+        '<div class="log-meta">' + datesStr + (dayVal ? ' · ' + dayVal + ' day' + (dayVal !== 1 ? 's' : '') : '') + (log.halfDay ? ' <span class="status-pill pill-halfday" style="margin-left:4px;">Half-day</span>' : '') + '</div>' +
+        (log.notes ? '<div class="log-notes">' + esc(log.notes) + '</div>' : '') +
+        (log.reviewedBy ? '<div class="log-reviewer">Reviewed by ' + esc(log.reviewedBy) + '</div>' : '') +
+        (needsHandover ? '<button class="btn btn-amber btn-sm" style="margin-top:8px;" onclick="openHandoverModal(\'' + log.id + '\', \'' + esc(log.name || session.name) + '\', \'' + datesStr.replace(/'/g, "\\'") + '\')">🗂️ Submit Handover</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Team Dashboard tab ───────────────────────────────────────────────────────────
+function toggleBalanceDetail(rowId) {
+  const detail = document.getElementById(rowId);
+  const row = document.getElementById(rowId + '-row');
+  if (!detail || !row) return;
+  detail.classList.toggle('open');
+  row.classList.toggle('bt-open');
+}
+
+async function loadDashboard() {
+  const pendingSection = $('pendingSection');
+  const pendingList    = $('pendingList');
+  const balanceRows     = $('balanceRows');
+
+  const res = await api('getTeamDashboard');
+  if (!res.success) {
+    balanceRows.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted); font-size:0.82rem;">' + esc(res.message || 'Failed to load.') + '</div>';
+    return;
+  }
+
+  session.teamData = res.members;
+
+  // Pending requests (visible to all; approve/reject buttons for Chief only)
+  const pending = (res.pending || []).filter(p => p.type === 'Leave Request');
+  if (pending.length > 0) {
+    pendingSection.style.display = 'block';
+    $('pendingBadge').style.display = 'inline-flex';
+    $('pendingBadge').textContent = pending.length;
+
+    pendingList.innerHTML = pending.map(p => {
+      const me = session.teamData.find(m => m.name.toLowerCase() === p.name.toLowerCase());
+      const bal = me ? me.balance : null;
+      const datesStr = p.dates && p.dates.length > 0
+        ? (p.dates.length === 1 ? fmtDate(p.dates[0]) : fmtDate(p.dates[0]) + ' – ' + fmtDate(p.dates[p.dates.length - 1]))
+        : fmtDate(p.startDate) + (p.endDate && p.endDate !== p.startDate ? ' – ' + fmtDate(p.endDate) : '');
+      const isLeaveDay = p.entrySubtype === 'Leave';
+      const subtypeBadge = '<span style="font-size:9px; font-weight:700; padding:2px 7px; border-radius:10px; background:' +
+        (isLeaveDay ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' +
+        (isLeaveDay ? 'Leave Day · Chief + HR' : 'Comp Day · Chief only') + '</span>';
+      const dayVal = p.dayValue || 1;
+      const afterBal = bal ? (bal.leaveBalance - dayVal) : null;
+
+      const actions = session.role === 'Head of School'
+        ? '<div class="pc-actions">' +
+            '<button class="btn btn-green btn-sm" onclick="reviewPending(\'' + p.id + '\', \'approve\')">✓ Approve</button>' +
+            '<button class="btn btn-red btn-sm" onclick="reviewPending(\'' + p.id + '\', \'reject\')">✕ Reject</button>' +
+          '</div>'
+        : '<div class="no-action-note">Only the Head of School can approve or reject.</div>';
+
+      return '<div class="pending-card">' +
+        '<div class="pc-header">' +
+          '<div><div class="pc-name">' + esc(p.name) + '</div><div class="pc-date">' + datesStr + (p.halfDay ? ' <span class="status-pill pill-halfday" style="margin-left:4px;">Half-day</span>' : '') + '</div>' +
+          '<div style="margin-top:5px;">' + subtypeBadge + '</div></div>' +
+          '<span class="status-pill pill-pending">Pending</span>' +
+        '</div>' +
+        (p.notes ? '<div class="pc-notes">' + esc(p.notes) + '</div>' : '') +
+        (bal ? '<div class="bal-breakdown">' +
+          '<div class="bal-breakdown-title">Leave Balance — ' + esc(p.name) + '</div>' +
+          '<div class="bal-row"><span>Current Balance</span><span>' + bal.leaveBalance + ' days</span></div>' +
+          '<div class="bal-row"><span>Requesting</span><span>-' + dayVal + ' days</span></div>' +
+          '<div class="bal-row after"><span>After approval</span><span>' + afterBal + ' days</span></div>' +
+        '</div>' : '') +
+        actions +
+      '</div>';
+    }).join('');
+  } else {
+    pendingSection.style.display = 'none';
+    $('pendingBadge').style.display = 'none';
+  }
+
+  // Pending handovers (approved leave still awaiting a handover note from the employee)
+  const pendingHandoverSection = $('pendingHandoverSection');
+  const pendingHandoverList    = $('pendingHandoverList');
+  const pendingHandovers = res.pendingHandovers || [];
+  if (pendingHandovers.length > 0) {
+    pendingHandoverSection.style.display = 'block';
+    pendingHandoverList.innerHTML = pendingHandovers.map(p => {
+      const datesStr = p.dates && p.dates.length > 0
+        ? (p.dates.length === 1 ? fmtDate(p.dates[0]) : fmtDate(p.dates[0]) + ' – ' + fmtDate(p.dates[p.dates.length - 1]))
+        : fmtDate(p.startDate) + (p.endDate && p.endDate !== p.startDate ? ' – ' + fmtDate(p.endDate) : '');
+      const isMe = p.name.toLowerCase() === session.name.toLowerCase();
+
+      return '<div class="pending-card" style="border-left-color: var(--amber);">' +
+        '<div class="pc-header">' +
+          '<div><div class="pc-name">' + esc(p.name) + (isMe ? '<span class="me-badge" style="margin-left:6px;">You</span>' : '') + '</div>' +
+          '<div class="pc-date">' + datesStr + (p.halfDay ? ' <span class="status-pill pill-halfday" style="margin-left:4px;">Half-day</span>' : '') + '</div></div>' +
+          '<span class="status-pill pill-handover">Awaiting Handover</span>' +
+        '</div>' +
+        (isMe
+          ? '<button class="btn btn-amber btn-sm" style="margin-top:6px;" onclick="openHandoverModal(\'' + p.id + '\', \'' + esc(p.name) + '\', \'' + datesStr.replace(/'/g, "\\'") + '\')">🗂️ Submit Handover</button>'
+          : '<div class="no-action-note">Waiting on ' + esc(p.name) + ' to submit their handover.</div>') +
+      '</div>';
+    }).join('');
+  } else {
+    pendingHandoverSection.style.display = 'none';
+  }
+
+  // Balance table (all members)
+  balanceRows.innerHTML = (res.members || []).map(m => {
+    const bal = m.balance;
+    const isMe = m.name.toLowerCase() === session.name.toLowerCase();
+    const totalBal = bal.compBalance + bal.leaveBalance;
+    const balClass = totalBal < 0 ? 'c-danger' : totalBal <= 1 ? 'c-warn' : 'c-good';
+    const totalEarned  = bal.monthlyAlloc + bal.rolloverDays + bal.compDays + bal.compRollover;
+    const totalUsed    = bal.leaveUsedDays + bal.compUsedDays;
+    const totalPending = (bal.pendingDays || 0) + (bal.compPendingDays || 0);
+    const rowId = 'bt-detail-' + m.name.replace(/[^a-zA-Z0-9]/g, '');
+    const chevronSvg = '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<div class="bt-row" id="' + rowId + '-row" onclick="toggleBalanceDetail(\'' + rowId + '\')" style="cursor:pointer;">' +
+      '<div class="bt-chevron">' + chevronSvg + '</div>' +
+      '<div class="bt-cell bt-name">' + esc(m.name) +
+        (m.role !== 'Member' ? '<span class="role-badge">' + m.role + '</span>' : '') +
+        (isMe ? '<span class="me-badge">You</span>' : '') +
+      '</div>' +
+      '<div class="bt-cell">' + totalEarned + '</div>' +
+      '<div class="bt-cell">' + totalUsed + '</div>' +
+      '<div class="bt-cell">' + totalPending + '</div>' +
+      '<div class="bt-cell bt-bal ' + balClass + '">' + totalBal.toFixed(1) + '</div>' +
+    '</div>' +
+    '<div class="bt-detail" id="' + rowId + '">' +
+      '<div class="bt-detail-card bt-detail-leave">' +
+        '<div class="bt-detail-card-title">🌴 Leave Balance</div>' +
+        '<div class="bt-detail-item"><span>Monthly + rollover</span><b>' + (bal.monthlyAlloc + bal.rolloverDays).toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Leave Day used</span><b>' + bal.leaveUsedDays + '</b></div>' +
+        '<div class="bt-detail-item"><span>Balance</span><b>' + bal.leaveBalance.toFixed(1) + '</b></div>' +
+      '</div>' +
+      '<div class="bt-detail-card bt-detail-comp">' +
+        '<div class="bt-detail-card-title">🗓️ Overtime Comp</div>' +
+        '<div class="bt-detail-item"><span>Earned + rollover</span><b>' + (bal.compDays + bal.compRollover).toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Compensation Day used</span><b>' + bal.compUsedDays + '</b></div>' +
+        '<div class="bt-detail-item"><span>Balance</span><b>' + bal.compBalance.toFixed(1) + '</b></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function reviewPending(id, action) {
+  showLoader(action === 'approve' ? 'Approving…' : 'Rejecting…');
+  const res = await api('reviewEntry', { id, action, reviewerName: session.name });
+  hideLoader();
+
+  if (!res.success) {
+    showAlert(res.message || 'Action failed.', '❌');
+    return;
+  }
+
+  showAlert(action === 'approve' ? 'Request approved.' : 'Request rejected.', '✓');
+  loadDashboard();
+}
+
+checkUrlParams();
+</script>
+
+</body>
+</html>
