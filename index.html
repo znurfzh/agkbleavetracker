@@ -805,7 +805,7 @@
       </div>
       <div class="bal-panel" id="panelMonthly">
         <div class="bal-panel-icon">🌴</div>
-        <div class="bal-panel-label">Leave Balance</div>
+        <div class="bal-panel-label">Annual Leave</div>
         <div class="bal-panel-val" id="panelMonthlyVal">—</div>
         <div class="bal-panel-sub" id="panelMonthlySub">days remaining</div>
         <div class="bal-panel-breakdown">
@@ -814,8 +814,8 @@
         </div>
       </div>
       <div class="bal-panel" id="panelOT">
-        <div class="bal-panel-icon">🗓️</div>
-        <div class="bal-panel-label">Overtime Comp</div>
+        <div class="bal-panel-icon">🤒</div>
+        <div class="bal-panel-label">Sick Days</div>
         <div class="bal-panel-val" id="panelOTVal">—</div>
         <div class="bal-panel-sub" id="panelOTSub">days earned</div>
         <div class="bal-panel-breakdown">
@@ -953,12 +953,7 @@
         </select>
       </div>
 
-      <div class="type-grid" id="impTypeGrid" style="margin-bottom:14px; grid-template-columns: 1fr 1fr;">
-        <button class="type-card" id="imp-type-overtime" onclick="selectImportType('Overtime Compensation')">
-          <span class="tc-icon">🗓️</span>
-          <div class="tc-name">Overtime Compensation</div>
-          <div class="tc-desc">Past weekend workday</div>
-        </button>
+            <div class="type-grid" id="impTypeGrid" style="margin-bottom:14px; grid-template-columns: 1fr 1fr;">
         <button class="type-card" id="imp-type-leave" onclick="selectImportType('Leave Request')">
           <span class="tc-icon">🌴</span>
           <div class="tc-name">Leave (Approved)</div>
@@ -967,28 +962,8 @@
         <button class="type-card" id="imp-type-leavecredit" onclick="selectImportType('Leave Allowance')" style="grid-column: 1 / -1;">
           <span class="tc-icon">💳</span>
           <div class="tc-name">Leave Allowance (Rollover Credit)</div>
-          <div class="tc-desc">Manually credit a prior year's leave balance — mirrors how Overtime Compensation works for the comp bucket</div>
+          <div class="tc-desc">Manually credit a prior year's leave balance</div>
         </button>
-      </div>
-
-      <div class="field" id="impSubtypeField" style="display:none; margin-bottom:14px;">
-        <label for="impSubtype">Leave Type</label>
-        <select id="impSubtype">
-          <option value="Annual Leave">Annual Leave (12 days/year — Batch 1)</option>
-          <option value="Sick Day">Sick Day (doctor letter required for 2+ consecutive days)</option>
-        </select>
-      </div>
-
-      <div id="impCreditSection" style="display:none;">
-        <div class="field">
-          <label for="impCreditYear">Year</label>
-          <input type="number" id="impCreditYear" placeholder="e.g. 2025" min="2000" max="2100" step="1" oninput="updateImportButton()">
-        </div>
-        <div class="field">
-          <label for="impCreditDays">Days to Credit</label>
-          <input type="number" id="impCreditDays" placeholder="e.g. 2.5" min="0.5" step="0.5" oninput="updateImportButton()">
-        </div>
-        <div class="field-desc" style="margin-top:-6px;">This adds a leave-day credit for that year — it will show as rollover once the current policy year compares it against any Leave Days used that year.</div>
       </div>
 
       <div id="impDateSection" style="display:none;">
@@ -1522,78 +1497,65 @@ async function loadMyBalance(dashRes) {
   if (!me) return;
   const bal = me.balance;
 
-  // ── Total panel: sum of both independent buckets ──
+  // Total panel
+  const totalLeft = (bal.annualBalance || 0) + (bal.sickBalance || 0);
   const totalVal = $('panelTotalVal');
-  const totalLeft = bal.compBalance + bal.leaveBalance;
   totalVal.textContent = totalLeft.toFixed(1);
   totalVal.className = 'bal-panel-val';
   if (totalLeft < 0) totalVal.classList.add('danger');
   else if (totalLeft <= 1) totalVal.classList.add('warn');
-
-  const totalGained = bal.monthlyAlloc + bal.rolloverDays + bal.compDays + bal.compRollover;
-  const totalUsed   = bal.leaveUsedDays + bal.compUsedDays;
-  $('panelTotalSub').textContent = bal.compUsedDays + ' comp · ' + bal.leaveUsedDays + ' leave used' +
-    ((bal.pendingDays + bal.compPendingDays) > 0 ? ' · ' + (bal.pendingDays + bal.compPendingDays) + ' pending' : '');
-  $('panelTotalGained').textContent = '+' + totalGained;
-  $('panelTotalUsedB').textContent = '-' + totalUsed;
-
+  $('panelTotalSub').textContent = (bal.annualUsedDays || 0) + ' annual · ' + (bal.sickUsedDays || 0) + ' sick used';
+  $('panelTotalGained').textContent = '+' + ((bal.annualAlloc || 0) + (bal.sickAlloc || 0) + (bal.annualRollover || 0) + (bal.sickRollover || 0));
+  $('panelTotalUsedB').textContent = '-' + ((bal.annualUsedDays || 0) + (bal.sickUsedDays || 0));
   const rolloverEl = $('panelRolloverPills');
-  if (bal.rolloverBreakdown && bal.rolloverBreakdown.length > 0) {
+  if (rolloverEl && bal.rolloverBreakdown && bal.rolloverBreakdown.length > 0) {
     rolloverEl.innerHTML = bal.rolloverBreakdown.map(r =>
-      '<span class="pill-rollover">+' + r.days + ' ' + (r.bucket === 'comp' ? 'comp' : 'leave') + ' ' + r.year + '</span>'
+      '<span class="pill-rollover">+' + r.days + ' ' + r.bucket + ' ' + r.year + '</span>'
     ).join('');
-  } else {
-    rolloverEl.innerHTML = '';
-  }
+  } else if (rolloverEl) { rolloverEl.innerHTML = ''; }
 
-  // ── Leave Balance panel: Leave bucket only ──
+  // Annual Leave panel
   const monthlyVal = $('panelMonthlyVal');
-  monthlyVal.textContent = bal.leaveBalance.toFixed(1);
+  monthlyVal.textContent = (bal.annualBalance || 0).toFixed(1);
   monthlyVal.className = 'bal-panel-val';
-  if (bal.leaveBalance < 0) monthlyVal.classList.add('danger');
-  else if (bal.leaveBalance <= 1) monthlyVal.classList.add('warn');
-  $('panelMonthlySub').textContent = bal.leaveUsedDays + ' leave day' + (bal.leaveUsedDays !== 1 ? 's' : '') + ' used' +
-    (bal.rolloverDays > 0 ? ' · +' + bal.rolloverDays + ' rollover' : '');
-  $('panelMonthlyGained').textContent = '+' + (bal.monthlyAlloc + bal.rolloverDays);
-  $('panelMonthlyUsedB').textContent = '-' + bal.leaveUsedDays;
+  if ((bal.annualBalance || 0) < 0) monthlyVal.classList.add('danger');
+  else if ((bal.annualBalance || 0) <= 1) monthlyVal.classList.add('warn');
+  $('panelMonthlySub').textContent = (bal.annualUsedDays || 0) + ' day' + ((bal.annualUsedDays || 0) !== 1 ? 's' : '') + ' used'
+    + ((bal.annualRollover || 0) > 0 ? ' · +' + bal.annualRollover + ' rollover' : '');
+  $('panelMonthlyGained').textContent = '+' + ((bal.annualAlloc || 0) + (bal.annualRollover || 0));
+  $('panelMonthlyUsedB').textContent = '-' + (bal.annualUsedDays || 0);
 
-  // ── Overtime Comp panel: Comp bucket only ──
+  // Sick Days panel
   const otVal = $('panelOTVal');
-  const compLeft = bal.compBalance;
-  otVal.textContent = compLeft.toFixed(1);
+  otVal.textContent = (bal.sickBalance || 0).toFixed(1);
   otVal.className = 'bal-panel-val';
-  if (compLeft < 0) otVal.classList.add('danger');
-  $('panelOTSub').textContent = bal.compUsedDays + ' comp day' + (bal.compUsedDays !== 1 ? 's' : '') + ' used' +
-    (bal.compRollover > 0 ? ' · +' + bal.compRollover + ' rollover' : '');
-  $('panelOTGained').textContent = '+' + (bal.compDays + bal.compRollover);
-  $('panelOTUsedB').textContent = '-' + bal.compUsedDays;
+  if ((bal.sickBalance || 0) < 0) otVal.classList.add('danger');
+  $('panelOTSub').textContent = (bal.sickUsedDays || 0) + ' sick day' + ((bal.sickUsedDays || 0) !== 1 ? 's' : '') + ' used'
+    + ((bal.sickRollover || 0) > 0 ? ' · +' + bal.sickRollover + ' rollover' : '');
+  $('panelOTGained').textContent = '+' + ((bal.sickAlloc || 0) + (bal.sickRollover || 0));
+  $('panelOTUsedB').textContent = '-' + (bal.sickUsedDays || 0);
 }
 
 function selectImportType(type) {
   importType = type;
   document.querySelectorAll('#panel-import .type-card').forEach(c => c.classList.remove('selected'));
-
-  // Reset all conditional sections first
   $('impSubtypeField').style.display = 'none';
   $('impDateSection').style.display = 'none';
   $('impCreditSection').style.display = 'none';
   $('impNotesField').style.display = '';
 
-  if (type === 'Overtime Compensation') {
-    $('imp-type-overtime').classList.add('selected');
-    $('impDateSection').style.display = 'block';
-  } else if (type === 'Leave Request') {
+  if (type === 'Leave Request') {
     $('imp-type-leave').classList.add('selected');
     $('impSubtypeField').style.display = '';
-    $('impSubtype').value = 'Day Off';
+    $('impSubtype').value = 'Annual Leave';
     $('impDateSection').style.display = 'block';
     $('impNotesField').style.display = 'none';
     $('impNotes').value = '';
   } else if (type === 'Leave Allowance') {
     $('imp-type-leavecredit').classList.add('selected');
     $('impCreditSection').style.display = 'block';
-    $('impCreditYear').value = '';
-    $('impCreditDays').value = '';
+    if ($('impCreditYear')) $('impCreditYear').value = '';
+    if ($('impCreditDays')) $('impCreditDays').value = '';
   }
 
   selectedImportDates = [];
