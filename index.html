@@ -925,7 +925,7 @@
   <div class="tab-panel" id="panel-teamhistory">
   <div class="hist-filter-row">
     <button class="hist-filter-btn active" id="hist-btn-all" onclick="filterTeamHistory('all')">All</button>
-    <button class="hist-filter-btn" id="hist-btn-overtime" onclick="filterTeamHistory('Overtime Compensation')">🗓️ Overtime Comp</button>
+    
     <button class="hist-filter-btn" id="hist-btn-leave" onclick="filterTeamHistory('Leave Request')">🌴 Leave Request</button>
     <select class="hist-member-filter" id="hist-member-filter" onchange="filterTeamHistory()">
       <option value="">All Members</option>
@@ -1084,7 +1084,7 @@ function filterTeamHistory(type) {
   if (type !== undefined) {
     _histActiveFilter = type;
     document.querySelectorAll('.hist-filter-btn').forEach(b => b.classList.remove('active'));
-    $('hist-btn-' + (type === 'all' ? 'all' : type === 'Overtime Compensation' ? 'overtime' : 'leave')).classList.add('active');
+    $('hist-btn-' + (type === 'all' ? 'all' : false /* AGKB: no overtime */ ? 'overtime' : 'leave')).classList.add('active');
   }
   renderTeamHistory();
 }
@@ -1095,9 +1095,7 @@ function renderTeamHistory() {
   const memberFilter = $('hist-member-filter').value;
 
   let logs = [];
-  if (_histActiveFilter === 'all' || _histActiveFilter === 'Overtime Compensation') {
-    logs = logs.concat((_teamHistData.overtimeLogs || []).map(l => ({ ...l, type: l.type || 'Overtime Compensation' })));
-  }
+  // AGKB: no overtime
   if (_histActiveFilter === 'all' || _histActiveFilter === 'Leave Request') {
     logs = logs.concat((_teamHistData.leaveLogs || []).map(l => ({ ...l, type: l.type || 'Leave Request' })));
   }
@@ -1118,9 +1116,9 @@ function renderTeamHistory() {
   }
 
   list.innerHTML = logs.map(log => {
-    const icon = log.type === 'Overtime Compensation' ? '🗓️' : log.type === 'Leave Allowance' ? '💳' : '🌴';
+    const icon = log.type === 'Leave Allowance' ? '💳' : '🌴';
     const subtypeBadge = log.type === 'Leave Request' && log.entrySubtype
-      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Leave' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Leave' ? 'Leave Day' : 'Comp Day') + '</span>'
+      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Sick Day' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Sick Day' ? 'Sick Day' : 'Annual Leave') + '</span>'
       : '';
     const datesStr = log.dates && log.dates.length > 0
       ? log.dates.length === 1 ? fmtDate(log.dates[0]) : fmtDate(log.dates[0]) + ' – ' + fmtDate(log.dates[log.dates.length - 1])
@@ -1249,7 +1247,7 @@ async function doLogin() {
     return;
   }
 
-  const reqRole = teamRes.members?.find(m => m.name.toLowerCase() === name.toLowerCase())?.role || 'Member';
+  const reqRole = teamRes.members?.find(m => m.name.toLowerCase() === name.toLowerCase())?.role || 'Teacher';
   session.role = reqRole;
 
   if (reqRole === 'Head of School') {
@@ -1837,9 +1835,9 @@ async function loadMyHistory() {
   renderHandoverBanner(res.logs);
 
   list.innerHTML = res.logs.map(log => {
-    const icon = log.type === 'Overtime Compensation' ? '🗓️' : log.type === 'Leave Allowance' ? '💳' : '🌴';
+    const icon = log.type === 'Leave Allowance' ? '💳' : '🌴';
     const subtypeBadge = log.type === 'Leave Request' && log.entrySubtype
-      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Leave' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Leave' ? 'Leave Day' : 'Comp Day') + '</span>'
+      ? ' <span style="font-size:9px; font-weight:700; padding:1px 6px; border-radius:10px; background:' + (log.entrySubtype === 'Sick Day' ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' + (log.entrySubtype === 'Sick Day' ? 'Sick Day' : 'Annual Leave') + '</span>'
       : '';
     const datesStr = log.dates && log.dates.length > 0
       ? log.dates.length === 1 ? fmtDate(log.dates[0]) : fmtDate(log.dates[0]) + ' – ' + fmtDate(log.dates[log.dates.length - 1])
@@ -1904,12 +1902,12 @@ async function loadDashboard() {
       const datesStr = p.dates && p.dates.length > 0
         ? (p.dates.length === 1 ? fmtDate(p.dates[0]) : fmtDate(p.dates[0]) + ' – ' + fmtDate(p.dates[p.dates.length - 1]))
         : fmtDate(p.startDate) + (p.endDate && p.endDate !== p.startDate ? ' – ' + fmtDate(p.endDate) : '');
-      const isLeaveDay = p.entrySubtype === 'Leave';
+      const isLeaveDay = p.entrySubtype === 'Sick Day';
       const subtypeBadge = '<span style="font-size:9px; font-weight:700; padding:2px 7px; border-radius:10px; background:' +
         (isLeaveDay ? 'var(--amber-lt); color:#92400e' : 'var(--blue-lt); color:var(--blue)') + ';">' +
-        (isLeaveDay ? 'Leave Day · Chief + HR' : 'Comp Day · Chief only') + '</span>';
+        (isLeaveDay ? 'Sick Day · Foundation Officer notified' : 'Annual Leave · Head of School only') + '</span>';
       const dayVal = p.dayValue || 1;
-      const afterBal = bal ? (bal.leaveBalance - dayVal) : null;
+      const afterBal = bal ? ((bal.annualBalance||0)+(bal.sickBalance||0)-dayVal) : null;
 
       const actions = session.role === 'Head of School'
         ? '<div class="pc-actions">' +
@@ -1970,17 +1968,17 @@ async function loadDashboard() {
   balanceRows.innerHTML = (res.members || []).map(m => {
     const bal = m.balance;
     const isMe = m.name.toLowerCase() === session.name.toLowerCase();
-    const totalBal = bal.compBalance + bal.leaveBalance;
+    const totalBal = (bal.annualBalance||0) + (bal.sickBalance||0);
     const balClass = totalBal < 0 ? 'c-danger' : totalBal <= 1 ? 'c-warn' : 'c-good';
-    const totalEarned  = bal.monthlyAlloc + bal.rolloverDays + bal.compDays + bal.compRollover;
-    const totalUsed    = bal.leaveUsedDays + bal.compUsedDays;
-    const totalPending = (bal.pendingDays || 0) + (bal.compPendingDays || 0);
+    const totalEarned  = (bal.annualAlloc||0) + (bal.annualRollover||0) + (bal.sickAlloc||0) + (bal.sickRollover||0);
+    const totalUsed    = (bal.annualUsedDays||0) + (bal.sickUsedDays||0);
+    const totalPending = (bal.annualPending||0) + (bal.sickPending||0);
     const rowId = 'bt-detail-' + m.name.replace(/[^a-zA-Z0-9]/g, '');
     const chevronSvg = '<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     return '<div class="bt-row" id="' + rowId + '-row" onclick="toggleBalanceDetail(\'' + rowId + '\')" style="cursor:pointer;">' +
       '<div class="bt-chevron">' + chevronSvg + '</div>' +
       '<div class="bt-cell bt-name">' + esc(m.name) +
-        (m.role !== 'Member' ? '<span class="role-badge">' + m.role + '</span>' : '') +
+        (m.role !== 'Teacher' ? '<span class="role-badge">' + m.role + '</span>' : '') +
         (isMe ? '<span class="me-badge">You</span>' : '') +
       '</div>' +
       '<div class="bt-cell">' + totalEarned + '</div>' +
@@ -1990,16 +1988,16 @@ async function loadDashboard() {
     '</div>' +
     '<div class="bt-detail" id="' + rowId + '">' +
       '<div class="bt-detail-card bt-detail-leave">' +
-        '<div class="bt-detail-card-title">🌴 Leave Balance</div>' +
-        '<div class="bt-detail-item"><span>Monthly + rollover</span><b>' + (bal.monthlyAlloc + bal.rolloverDays).toFixed(1) + '</b></div>' +
-        '<div class="bt-detail-item"><span>Leave Day used</span><b>' + bal.leaveUsedDays + '</b></div>' +
-        '<div class="bt-detail-item"><span>Balance</span><b>' + bal.leaveBalance.toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-card-title">🌴 Annual Leave</div>' +
+        '<div class="bt-detail-item"><span>Allocation + rollover</span><b>' + ((bal.annualAlloc||0)+(bal.annualRollover||0)).toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Annual Leave used</span><b>' + (bal.annualUsedDays||0) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Balance</span><b>' + (bal.annualBalance||0).toFixed(1) + '</b></div>' +
       '</div>' +
       '<div class="bt-detail-card bt-detail-comp">' +
-        '<div class="bt-detail-card-title">🗓️ Overtime Comp</div>' +
-        '<div class="bt-detail-item"><span>Earned + rollover</span><b>' + (bal.compDays + bal.compRollover).toFixed(1) + '</b></div>' +
-        '<div class="bt-detail-item"><span>Compensation Day used</span><b>' + bal.compUsedDays + '</b></div>' +
-        '<div class="bt-detail-item"><span>Balance</span><b>' + bal.compBalance.toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-card-title">🤒 Sick Days</div>' +
+        '<div class="bt-detail-item"><span>Allocation + rollover</span><b>' + ((bal.sickAlloc||0)+(bal.sickRollover||0)).toFixed(1) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Sick Days used</span><b>' + (bal.sickUsedDays||0) + '</b></div>' +
+        '<div class="bt-detail-item"><span>Balance</span><b>' + (bal.sickBalance||0).toFixed(1) + '</b></div>' +
       '</div>' +
     '</div>';
   }).join('');
