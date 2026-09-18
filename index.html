@@ -854,6 +854,7 @@
             <input type="date" id="datePickerInput" class="field" style="margin-bottom:0;">
             <button class="btn-add-date" onclick="addDate()">+ Add</button>
           </div>
+          <div class="date-summary" id="dateSummary"></div>
         </div>
         <label class="half-day-row" id="halfDayRow" onclick="toggleHalfDay()">
           <input type="checkbox" id="halfDayCheck" onclick="event.stopPropagation(); toggleHalfDay()">
@@ -966,6 +967,25 @@
         </button>
       </div>
 
+      <div class="field" id="impSubtypeField" style="display:none; margin-bottom:14px;">
+        <label for="impSubtype">Leave Type</label>
+        <select id="impSubtype" onchange="updateImportButton()">
+          <option value="Annual Leave">Annual Leave</option>
+          <option value="Sick Day">Sick Day</option>
+        </select>
+      </div>
+
+      <div id="impCreditSection" style="display:none;">
+        <div class="field">
+          <label for="impCreditYear">Year</label>
+          <input type="number" id="impCreditYear" placeholder="e.g. 2023" oninput="updateImportButton()">
+        </div>
+        <div class="field">
+          <label for="impCreditDays">Days to Credit</label>
+          <input type="number" id="impCreditDays" placeholder="e.g. 3" step="0.5" min="0" oninput="updateImportButton()">
+        </div>
+      </div>
+
       <div id="impDateSection" style="display:none;">
         <div class="field">
           <label>Selected Dates</label>
@@ -1034,11 +1054,11 @@ const closeAlert  = ()              => $('alertModal').classList.remove('show');
 async function api(action, extra = {}) {
   try {
     const payload = {
-      action,
       sheetId: extra.sheetId || session.sheetId,
       name:    extra.name    !== undefined ? extra.name    : session.name,
       pin:     extra.pin     !== undefined ? extra.pin     : session.pin,
       ...extra,
+      action,
     };
     const body = new URLSearchParams();
     for (const [k, v] of Object.entries(payload)) {
@@ -1290,10 +1310,12 @@ function doLogout() {
   $('loginSheetId').value = '';
   $('loginName').value = '';
   $('inlinePin').value = '';
-  $('leaveSubtype').value = 'Day Off';
+  $('leaveSubtype').value = 'Annual Leave';
   $('notesInput').value = '';
   $('impName').value = '';
   $('impNotes').value = '';
+  $('impCreditYear').value = '';
+  $('impCreditDays').value = '';
 }
 
 function onNameSelect(name) {
@@ -1451,7 +1473,8 @@ async function doSubmit() {
   }
 
   const statusMsg = res.status === 'APPROVED'
-    `✓ Submitted — pending Head of School approval (${res.dayValue} days)`;
+    ? `✓ Approved (${res.dayValue} days)`
+    : `✓ Submitted — pending Head of School approval (${res.dayValue} days)`;
   $('submitMsg').textContent = statusMsg;
   $('submitMsg').style.color = 'var(--green)';
 
@@ -2005,7 +2028,7 @@ async function loadDashboard() {
 
 async function reviewPending(id, action) {
   showLoader(action === 'approve' ? 'Approving…' : 'Rejecting…');
-  const res = await api('reviewEntry', { id, action, reviewerName: session.name });
+  const res = await api('reviewEntry', { id, reviewAction: action, reviewerName: session.name });
   hideLoader();
 
   if (!res.success) {
